@@ -295,13 +295,34 @@ export default function ReservationModal({
                           {selectedTableNumber ? `#${selectedTableNumber}` : "Não selecionada"}
                         </span>
                       </div>
-                      <div className="border-t border-soccer-field mt-3 pt-3 flex justify-between items-center">
-                        <span className="text-sm font-display font-medium text-soccer-cream">Valor Total:</span>
-                        <span className="text-xl font-display font-extrabold text-soccer-gold font-mono">
-                          R$ {calculatePrice()},00
-                        </span>
+                      <div className="border-t border-soccer-field mt-3 pt-3 space-y-1.5 text-right flex flex-col items-end">
+                        <div className="flex justify-between w-full items-center">
+                          <span className="text-xs font-display font-medium text-soccer-cream/70">Custo por Pessoa:</span>
+                          <span className="text-lg font-display font-black text-soccer-gold font-mono animate-pulse">
+                            {tableType === "mesa4" 
+                              ? `4x R$ ${Math.round((game.priceTable4 || 24) / 4)} por pessoa` 
+                              : `2x R$ ${Math.round((game.priceTable2 || 12) / 2)} por pessoa`}
+                          </span>
+                        </div>
+                        {game.isBrazilGame && (
+                          <span className="text-[10px] text-soccer-cream/45">
+                            Total da mesa para o PIX: R$ {calculatePrice()},00
+                          </span>
+                        )}
                       </div>
                     </div>
+
+                    {selectedTableNumber && (
+                      <div className="bg-amber-500/10 border border-amber-500/30 p-3.5 rounded-xl text-[10px] text-amber-200 mt-4 leading-relaxed animate-pulse">
+                        <div className="flex gap-2">
+                          <AlertTriangle className="w-4 h-4 text-soccer-orange shrink-0 mt-0.5" />
+                          <div>
+                            <strong className="text-soccer-orange block font-bold mb-0.5 uppercase tracking-wide">ATENÇÃO À OCUPAÇÃO:</strong>
+                            A numeração da mesa no mapa serve para controle de setores. A ocupação física das mesas ocorre por <strong className="text-white underline">ordem de chegada</strong> no dia do evento.
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
                     {!game.isBrazilGame && (
                       <div className="bg-amber-500/10 border border-amber-500/30 p-3 rounded-xl text-[10px] text-amber-300 mt-4 leading-relaxed">
@@ -387,8 +408,11 @@ export default function ReservationModal({
                     {/* GRID DISPLAY FOR TABLES OF 4 (30 Tables) */}
                     {tableType === "mesa4" && (
                       <div>
-                        <div className="text-[11px] font-mono text-soccer-cream/70 uppercase mb-2">
-                          MESA PARA 4 PESSOAS (30 Mesas Disponíveis)
+                        <div className="text-[11px] font-mono text-soccer-cream/70 uppercase mb-2 flex items-center justify-between">
+                          <span>MESA PARA 4 PESSOAS (30 Mesas Disponíveis)</span>
+                          {game.isBrazilGame && (
+                            <span className="text-soccer-gold font-bold">4x R$ {Math.round((game.priceTable4 || 24) / 4)}/pessoa</span>
+                          )}
                         </div>
                         <div className="grid grid-cols-5 sm:grid-cols-6 lg:grid-cols-6 gap-3 p-4 bg-[#03150b] rounded-2xl border border-soccer-field max-h-[300px] overflow-y-auto">
                           {mesa4Numbers.map((num) => {
@@ -426,8 +450,11 @@ export default function ReservationModal({
                     {/* GRID DISPLAY FOR TABLES OF 2 (3 Tables) */}
                     {tableType === "mesa2" && (
                       <div>
-                        <div className="text-[11px] font-mono text-soccer-cream/70 uppercase mb-2">
-                          MESA PARA 2 PESSOAS (3 Mesas Disponíveis)
+                        <div className="text-[11px] font-mono text-soccer-cream/70 uppercase mb-2 flex items-center justify-between">
+                          <span>MESA PARA 2 PESSOAS (3 Mesas Disponíveis)</span>
+                          {game.isBrazilGame && (
+                            <span className="text-soccer-gold font-bold">2x R$ {Math.round((game.priceTable2 || 12) / 2)}/pessoa</span>
+                          )}
                         </div>
                         <div className="grid grid-cols-3 gap-4 p-4 bg-[#03150b] rounded-2xl border border-soccer-field">
                           {mesa2Numbers.map((num) => {
@@ -468,6 +495,18 @@ export default function ReservationModal({
                         Direção do Telão Principal 📺
                       </div>
                       <div className="w-full bg-gradient-to-r from-transparent via-soccer-gold/20 to-transparent h-1" />
+                    </div>
+
+                    {/* Highly visible first-come first-served seating layout warning */}
+                    <div className="mt-4 p-4 rounded-xl bg-soccer-orange/15 border border-soccer-orange/40 text-xs text-amber-200 leading-relaxed font-sans shadow-lg">
+                      <div className="flex gap-2.5 items-start">
+                        <AlertTriangle className="w-5 h-5 text-soccer-orange shrink-0 mt-0.5 animate-bounce" />
+                        <div>
+                          <span className="font-bold text-soccer-orange block uppercase tracking-wide mb-1">REGRAS DE POSICIONAMENTO DA MESA:</span>
+                          As mesas físicas são ocupadas estritamente por <strong className="text-white underline">ordem de chegada</strong> no dia do jogo. 
+                          O número selecionado no mapa serve apenas para controle de limites e capacidade e <strong className="text-white underline">não corresponde</strong> à uma demarcação física exata ou posição definitiva no espaço do evento.
+                        </div>
+                      </div>
                     </div>
 
                   </div>

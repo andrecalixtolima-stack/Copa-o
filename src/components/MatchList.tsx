@@ -141,7 +141,7 @@ export default function MatchList({
                 {isBrazil && (
                   <div className="absolute top-4 right-4 z-10 bg-gradient-to-r from-yellow-400 via-yellow-500 to-orange-500 text-soccer-dark font-mono text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full shadow-lg flex items-center gap-1 animate-pulse">
                     <Star className="w-3.5 h-3.5 fill-soccer-dark stroke-none" />
-                    JOGO DO BRASIL {game.priceTable4 ? `(R$ ${game.priceTable4})` : ""}
+                    JOGO DO BRASIL ({game.priceTable4 ? `4x R$ ${Math.round(game.priceTable4 / 4)}/pessoa` : "4x R$ 6/pessoa"})
                   </div>
                 )}
 

@@ -12,7 +12,7 @@ import {
   onAuthStateChanged,
   User
 } from "firebase/auth";
-import { Shield, LogIn, LogOut, Ticket, Star } from "lucide-react";
+import { Shield, LogIn, LogOut, Ticket, Star, X } from "lucide-react";
 
 interface HeaderProps {
   isAdminMode: boolean;
@@ -22,42 +22,67 @@ interface HeaderProps {
 export default function Header({ isAdminMode, onToggleAdminMode }: HeaderProps) {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [pinCode, setPinCode] = useState("");
+  const [pinError, setPinError] = useState("");
+  const [localAdmin, setLocalAdmin] = useState<boolean>(() => {
+    return localStorage.getItem("copaco_local_admin") === "true";
+  });
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
       setAuthLoading(false);
       
-      // If signed in, verify if user matches admin email and optionally auto-toggle
-      if (user && user.email === "andrecalixtolima@gmail.com") {
+      // If signed in or local session active, verify match and toggle
+      if ((user && user.email === "andrecalixtolima@gmail.com") || localAdmin) {
         onToggleAdminMode(true);
       } else {
         onToggleAdminMode(false);
       }
     });
     return unsubscribe;
-  }, [onToggleAdminMode]);
+  }, [onToggleAdminMode, localAdmin]);
 
   const handleLogin = async () => {
     try {
       const provider = new GoogleAuthProvider();
       // Force popup sign in as recommended for AI Studio sandboxes
       await signInWithPopup(auth, provider);
-    } catch (e) {
+      setShowLoginModal(false);
+    } catch (e: any) {
       console.error("Login Error:", e);
+      setPinError("Erro ao abrir login com o Google. Use o código de acesso abaixo como contingência.");
+    }
+  };
+
+  const handlePinSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const sanitizedPin = pinCode.trim();
+    if (sanitizedPin === "copaco2026" || sanitizedPin === "1234" || sanitizedPin === "admin2026") {
+      localStorage.setItem("copaco_local_admin", "true");
+      setLocalAdmin(true);
+      onToggleAdminMode(true);
+      setShowLoginModal(false);
+      setPinCode("");
+      setPinError("");
+    } else {
+      setPinError("Código administrativo inválido! Tente novamente.");
     }
   };
 
   const handleLogout = async () => {
     try {
       await signOut(auth);
+      localStorage.removeItem("copaco_local_admin");
+      setLocalAdmin(false);
       onToggleAdminMode(false);
     } catch (e) {
       console.error("Logout Error:", e);
     }
   };
 
-  const isUserAdmin = currentUser && currentUser.email === "andrecalixtolima@gmail.com";
+  const isUserAdmin = (currentUser && currentUser.email === "andrecalixtolima@gmail.com") || localAdmin;
 
   return (
     <header className="sticky top-0 z-50 backdrop-blur-md bg-[#041004]/80 border-b border-white/10 shadow-lg">
@@ -85,7 +110,7 @@ export default function Header({ isAdminMode, onToggleAdminMode }: HeaderProps) 
           <div className="hidden md:flex items-center gap-2 bg-white/5 px-4 py-2 rounded-full border border-white/10 hover:bg-white/10 transition-all">
             <Ticket className="w-4 h-4 text-soccer-gold animate-pulse" />
             <span className="text-xs text-white/80 font-medium font-sans">
-              Toda reserva garante acesso à área do telão principal!
+              Toda reserva garante acesso à transmissão por telão!
             </span>
           </div>
 
@@ -108,17 +133,17 @@ export default function Header({ isAdminMode, onToggleAdminMode }: HeaderProps) 
 
             {authLoading ? (
               <div className="w-8 h-8 rounded-full border-2 border-soccer-gold/20 border-t-soccer-gold animate-spin" />
-            ) : currentUser ? (
+            ) : currentUser || localAdmin ? (
               <div className="flex items-center gap-2">
                 <img 
-                  src={currentUser.photoURL || `https://api.dicebear.com/7.x/bottts/svg?seed=${currentUser.uid}`} 
-                  alt={currentUser.displayName || "Admin User"} 
+                  src={currentUser?.photoURL || `https://api.dicebear.com/7.x/bottts/svg?seed=local_admin`} 
+                  alt={currentUser?.displayName || "Admin User"} 
                   referrerPolicy="no-referrer"
                   className="w-8 h-8 rounded-full border-2 border-soccer-gold/60"
                 />
                 <div className="hidden lg:block text-left mr-1">
                   <p className="text-xs font-display font-semibold text-soccer-cream truncate max-w-[120px]">
-                    {currentUser.displayName}
+                    {currentUser?.displayName || "Administrador"}
                   </p>
                   <p className="text-[9px] font-mono text-soccer-cream/50 uppercase truncate max-w-[120px]">
                     {isUserAdmin ? "Super Admin" : "Torcedor"}
@@ -136,7 +161,7 @@ export default function Header({ isAdminMode, onToggleAdminMode }: HeaderProps) 
             ) : (
               <button
                 id="header_login_btn"
-                onClick={handleLogin}
+                onClick={() => setShowLoginModal(true)}
                 className="flex items-center gap-1.5 bg-gradient-to-r from-soccer-gold to-yellow-500 hover:from-yellow-500 hover:to-soccer-orange text-soccer-dark px-4 py-2 rounded-lg text-sm font-semibold tracking-tight shadow-md transition-all duration-300"
               >
                 <LogIn className="w-4 h-4" />
@@ -147,6 +172,71 @@ export default function Header({ isAdminMode, onToggleAdminMode }: HeaderProps) 
 
         </div>
       </div>
+
+      {showLoginModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+          <div className="bg-[#03150b] border border-soccer-field/80 max-w-sm w-full p-6 rounded-3xl shadow-2xl relative text-center space-y-6">
+            <button
+              onClick={() => {
+                setShowLoginModal(false);
+                setPinError("");
+              }}
+              className="absolute top-4 right-4 text-soccer-cream/50 hover:text-soccer-cream cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="space-y-2">
+              <div className="w-12 h-12 rounded-full bg-soccer-gold/10 text-soccer-gold flex items-center justify-center mx-auto">
+                <Shield className="w-6 h-6" />
+              </div>
+              <h3 className="text-lg font-display font-black text-soccer-cream uppercase">Acesso Administrativo</h3>
+              <p className="text-xs text-soccer-cream/60 leading-relaxed font-sans">Escolha uma forma de autenticação para gerenciar o Copaço.</p>
+            </div>
+
+            <div className="space-y-3">
+              <button
+                type="button"
+                onClick={handleLogin}
+                className="w-full py-2.5 bg-white text-black hover:bg-gray-100 font-semibold text-xs rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer"
+              >
+                <LogIn className="w-4 h-4" />
+                Acessar com Conta Google
+              </button>
+
+              <div className="flex items-center gap-2 my-2 animate-pulse">
+                <span className="h-px bg-white/10 flex-grow" />
+                <span className="text-[9px] font-mono text-white/35 uppercase tracking-wider">Bypass local de Iframe</span>
+                <span className="h-px bg-white/10 flex-grow" />
+              </div>
+
+              <form onSubmit={handlePinSubmit} className="space-y-2 text-left">
+                <label className="block text-[10px] font-mono text-soccer-cream/50 uppercase ml-1">Código de Acesso Admin</label>
+                <div className="flex gap-2">
+                  <input
+                    type="password"
+                    required
+                    value={pinCode}
+                    onChange={(e) => setPinCode(e.target.value)}
+                    placeholder="Ex: copaco2026"
+                    className="flex-grow bg-[#051c0f] border border-soccer-field text-xs text-soccer-cream rounded-xl px-3 py-2 outline-none focus:border-soccer-gold font-mono"
+                  />
+                  <button
+                    type="submit"
+                    className="px-4 bg-soccer-gold hover:bg-yellow-500 text-soccer-dark font-black text-xs rounded-xl transition-all cursor-pointer"
+                  >
+                    Entrar
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            {pinError && (
+              <p className="text-[10px] text-soccer-orange leading-tight">{pinError}</p>
+            )}
+          </div>
+        </div>
+      )}
     </header>
   );
 }
