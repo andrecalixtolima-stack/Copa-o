@@ -34,6 +34,8 @@ export default function AdminPanel({ games, reservations, blockedTables, onRefre
 
   // State for Admin users
   const [adminUsers, setAdminUsers] = useState<any[]>([]);
+  const [loadingAdmins, setLoadingAdmins] = useState(false);
+  const [adminsError, setAdminsError] = useState<string | null>(null);
   const [logs, setLogs] = useState<any[]>([]);
   const [filteredLogs, setFilteredLogs] = useState<any[]>([]);
   
@@ -48,6 +50,8 @@ export default function AdminPanel({ games, reservations, blockedTables, onRefre
   const [backupFileName, setBackupFileName] = useState("");
 
   const fetchAdminsAndLogs = async () => {
+    setLoadingAdmins(true);
+    setAdminsError(null);
     try {
       const adminsRes = await fetch("/api/admins", {
         headers: {
@@ -55,9 +59,22 @@ export default function AdminPanel({ games, reservations, blockedTables, onRefre
           "x-admin-email": auth.currentUser?.email || ""
         }
       });
-      if (adminsRes.ok) {
-        const adminsData = await adminsRes.json();
+      
+      if (!adminsRes.ok) {
+        const errText = await adminsRes.text().catch(() => "Sem detalhes");
+        throw new Error(`Erro na API (${adminsRes.status}): ${errText.substring(0, 100)}`);
+      }
+
+      const contentType = adminsRes.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        throw new Error("O servidor retornou uma página que não é JSON. Verifique a configuração das rotas da API no Vercel.");
+      }
+
+      const adminsData = await adminsRes.json();
+      if (Array.isArray(adminsData)) {
         setAdminUsers(adminsData);
+      } else {
+        throw new Error("Os dados de administradores recebidos do servidor são inválidos.");
       }
 
       const logsRes = await fetch("/api/audit-logs", {
@@ -66,13 +83,20 @@ export default function AdminPanel({ games, reservations, blockedTables, onRefre
           "x-admin-email": auth.currentUser?.email || ""
         }
       });
+      
       if (logsRes.ok) {
-        const logsData = await logsRes.json();
-        setLogs(logsData);
-        setFilteredLogs(logsData);
+        const logContentType = logsRes.headers.get("content-type");
+        if (logContentType && logContentType.includes("application/json")) {
+          const logsData = await logsRes.json();
+          setLogs(logsData);
+          setFilteredLogs(logsData);
+        }
       }
-    } catch (err) {
+    } catch (err: any) {
       console.warn("Could not fetch admins or logs:", err);
+      setAdminsError(err.message || "Erro de conexão ao carregar administradores.");
+    } finally {
+      setLoadingAdmins(false);
     }
   };
 
@@ -2492,12 +2516,12 @@ export default function AdminPanel({ games, reservations, blockedTables, onRefre
                       <th className="py-2.5 text-right font-sans">Ação</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-soccer-field/10">
+                  <tbody className="divide-y divide-soccer-field/10 text-soccer-cream">
                     {adminUsers.map((user) => (
                       <tr key={user.uid} className="hover:bg-soccer-field/10">
-                        <td className="py-3 font-semibold text-soccer-cream">{user.email}</td>
-                        <td className="py-3 font-mono text-[10px] text-soccer-cream/60">{user.uid}</td>
-                        <td className="py-3 text-[11px] text-soccer-cream/70">{user.addedBy || "Superadmin"}</td>
+                        <td className="py-3 font-semibold text-soccer-cream truncate max-w-[150px]">{user.email}</td>
+                        <td className="py-3 font-mono text-[10px] text-soccer-cream/60 truncate max-w-[100px]">{user.uid}</td>
+                        <td className="py-3 text-[11px] text-soccer-cream/70 truncate max-w-[100px]">{user.addedBy || "Superadmin"}</td>
                         <td className="py-3 text-right">
                           {user.email === "andrecalixtolima@gmail.com" ? (
                             <span className="text-[9px] font-mono text-soccer-gold bg-soccer-gold/10 px-1.5 py-0.5 rounded font-bold">Founder</span>
@@ -2512,9 +2536,39 @@ export default function AdminPanel({ games, reservations, blockedTables, onRefre
                         </td>
                       </tr>
                     ))}
-                    {adminUsers.length === 0 && (
+                    
+                    {loadingAdmins && (
                       <tr>
-                        <td colSpan={4} className="py-4 text-center text-soccer-cream/40 font-mono">Carregando administradores oficiais...</td>
+                        <td colSpan={4} className="py-6 text-center text-soccer-gold font-mono text-xs">
+                          <span className="inline-block animate-spin mr-2">⚽</span>
+                          Buscando administradores oficiais...
+                        </td>
+                      </tr>
+                    )}
+
+                    {!loadingAdmins && adminsError && (
+                      <tr>
+                        <td colSpan={4} className="py-6 text-center text-red-400 font-mono text-xs px-2">
+                          <div className="bg-red-950/40 border border-red-900/60 p-3 rounded-lg text-left space-y-2">
+                            <p className="font-bold">⚠️ Falha ao listar administradores:</p>
+                            <p className="text-[11px] text-red-300/80 leading-relaxed font-sans">{adminsError}</p>
+                            <button
+                              type="button"
+                              onClick={fetchAdminsAndLogs}
+                              className="py-1 px-3 bg-red-900 hover:bg-red-800 text-white rounded text-[10px]"
+                            >
+                              Tentar Novamente
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+
+                    {!loadingAdmins && !adminsError && adminUsers.length === 0 && (
+                      <tr>
+                        <td colSpan={4} className="py-4 text-center text-soccer-cream/40 font-mono">
+                          Nenhum administrador adicional cadastrado.
+                        </td>
                       </tr>
                     )}
                   </tbody>

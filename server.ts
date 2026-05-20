@@ -15,19 +15,61 @@ import compression from "compression";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Load firebase config safely with fs to work perfectly across all node/tsx runner environments
-const firebaseConfig = JSON.parse(
-  fs.readFileSync(path.join(__dirname, "firebase-applet-config.json"), "utf8")
-);
-
-// Initialize Firebase Admin SDK for Cloud Run / Local
+// Load firebase config safely with fs to work perfectly across all environments (Vercel, Cloud Run, Local)
+let firebaseConfig: any = {};
 try {
-  admin.initializeApp({
-    projectId: firebaseConfig.projectId
-  });
-  console.log("[COPAÇO SERVER] Firebase Admin SDK initialized successfully.");
-} catch (error) {
-  console.warn("[COPAÇO SERVER] Firebase Admin SDK initialization fallback:", error);
+  const configPath = path.join(process.cwd(), "firebase-applet-config.json");
+  if (fs.existsSync(configPath)) {
+    firebaseConfig = JSON.parse(fs.readFileSync(configPath, "utf8"));
+  } else {
+    const fallbackPath = path.join(__dirname, "firebase-applet-config.json");
+    if (fs.existsSync(fallbackPath)) {
+      firebaseConfig = JSON.parse(fs.readFileSync(fallbackPath, "utf8"));
+    } else {
+      console.warn("[COPAÇO SERVER] Config file not found at path. Using environment defaults.");
+      firebaseConfig = {
+        projectId: process.env.FIREBASE_PROJECT_ID || "copaco-18b74",
+        firestoreDatabaseId: process.env.FIRESTORE_DATABASE_ID || "ai-studio-398a270b-78a3-408b-9ac9-7aca7526146e"
+      };
+    }
+  }
+} catch (err) {
+  console.error("[COPAÇO SERVER] Exception reading firebase-applet-config.json:", err);
+  firebaseConfig = {
+    projectId: "copaco-18b74",
+    firestoreDatabaseId: "ai-studio-398a270b-78a3-408b-9ac9-7aca7526146e"
+  };
+}
+
+// Initialize Firebase Admin SDK for Cloud Run / Local / Vercel
+if (admin.apps.length === 0) {
+  try {
+    if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+      const sa = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+      admin.initializeApp({
+        credential: admin.credential.cert(sa),
+        projectId: firebaseConfig.projectId
+      });
+      console.log("[COPAÇO SERVER] Firebase Admin SDK initialized with Service Account.");
+    } else if (process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL) {
+      admin.initializeApp({
+        credential: admin.credential.cert({
+          projectId: firebaseConfig.projectId,
+          clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+          privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n")
+        }),
+        projectId: firebaseConfig.projectId
+      });
+      console.log("[COPAÇO SERVER] Firebase Admin SDK initialized with Private Key credentials.");
+    } else {
+      admin.initializeApp({
+        projectId: firebaseConfig.projectId
+      });
+      console.log("[COPAÇO SERVER] Firebase Admin SDK initialized with ambient credentials.");
+    }
+  } catch (error) {
+    console.warn("[COPAÇO SERVER] Firebase Admin SDK initialization fallback warning:", error);
+  }
 }
 
 const databaseId = firebaseConfig.firestoreDatabaseId || "(default)";
@@ -89,9 +131,8 @@ async function isUserAdmin(uid: string | undefined, email: string | undefined): 
   return false;
 }
 
-async function startServer() {
-  const app = express();
-  const PORT = 3000;
+export const app = express();
+const PORT = 3000;
 
   // Compact payload responses to improve performance on standard 3G/4G connections inside the bar
   app.use(compression());
@@ -673,14 +714,20 @@ async function startServer() {
     }
   }, 35000); // Check every 35 seconds
 
-  // Initialize Vite Developer middleware if not in production
-  if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
+  // Initialize Vite Developer middleware if not in production and not serverless on Vercel
+  if (process.env.NODE_ENV !== "production" && !process.env.VERCEL) {
+    createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
+    }).then((vite) => {
+      app.use(vite.middlewares);
+      app.get("*", (req, res) => {
+        res.sendFile(path.join(process.cwd(), "index.html"));
+      });
+    }).catch((err) => {
+      console.error("[DEV SERVICE FAULT] Failed to load Vite Dev Server:", err);
     });
-    app.use(vite.middlewares);
-  } else {
+  } else if (!process.env.VERCEL) {
     // Serve production static assets compiled by Vite
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
@@ -689,10 +736,9 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`[COPAÇO SERVER] Backend running on port ${PORT}`);
-  });
-}
-
-startServer();
+  if (!process.env.VERCEL) {
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`[COPAÇO SERVER] Backend running on port ${PORT}`);
+    });
+  }
 
