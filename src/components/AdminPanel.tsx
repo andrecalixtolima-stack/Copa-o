@@ -1684,7 +1684,7 @@ export default function AdminPanel({ games, reservations, blockedTables, onRefre
                       </td>
                       <td className="px-4 py-4 truncate max-w-[150px]">
                         <div>{res.gameName}</div>
-                        <div className="text-[9px] font-mono text-soccer-cream/40">ID: {res.id.substring(0, 5).toUpperCase()}</div>
+                        <div className="text-[9px] font-mono text-soccer-cream/40">ID: {(res.id || "").substring(0, 5).toUpperCase()}</div>
                       </td>
                       <td className="px-4 py-4 font-mono text-xs font-black">
                         <span className="text-soccer-gold">

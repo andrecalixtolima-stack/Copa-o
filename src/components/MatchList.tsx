@@ -186,13 +186,13 @@ export default function MatchList({
                       <div className="flex items-center gap-2 mb-3 z-10 w-full justify-around">
                         <div className="flex flex-col items-center">
                           <div className="w-12 h-12 bg-soccer-cream/10 border border-soccer-cream/20 rounded-full flex items-center justify-center font-display font-black text-soccer-gold text-lg shadow-md uppercase">
-                            {game.homeTeam.substring(0, 2)}
+                            {(game.homeTeam || "").substring(0, 2)}
                           </div>
                         </div>
                         <div className="text-soccer-cream/40 font-mono text-[10px] uppercase font-bold">X</div>
                         <div className="flex flex-col items-center">
                           <div className="w-12 h-12 bg-soccer-cream/10 border border-soccer-cream/20 rounded-full flex items-center justify-center font-display font-black text-soccer-gold text-lg shadow-md uppercase">
-                            {game.awayTeam.substring(0, 2)}
+                            {(game.awayTeam || "").substring(0, 2)}
                           </div>
                         </div>
                       </div>
