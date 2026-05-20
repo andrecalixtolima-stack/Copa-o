@@ -4,8 +4,10 @@
  */
 
 import React, { useState } from "react";
-import { Game, Reservation, BlockedTable, DashboardMetrics, ReservationStatus, HomepageSettings, getDirectImageUrl } from "../types";
-import { db, handleFirestoreError, OperationType } from "../firebase";
+import { Game, Reservation, BlockedTable, DashboardMetrics, ReservationStatus, HomepageSettings, getDirectImageUrl, isValidDirectImageUrl } from "../types";
+import LogoImage from "./LogoImage";
+import { db, handleFirestoreError, OperationType, storage } from "../firebase";
+import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { 
   collection, addDoc, updateDoc, deleteDoc, doc, writeBatch, setDoc
 } from "firebase/firestore";
@@ -64,6 +66,13 @@ export default function AdminPanel({ games, reservations, blockedTables, onRefre
   const [textS4Title, setTextS4Title] = useState("");
   const [textS4Desc, setTextS4Desc] = useState("");
   const [textLogoUrl, setTextLogoUrl] = useState("");
+
+  // Storage upload debug states
+  const [uploadStatus, setUploadStatus] = useState<"idle" | "uploading" | "success" | "error">("idle");
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadError, setUploadError] = useState("");
+  const [firebaseResponse, setFirebaseResponse] = useState("");
+  const [uploadedFileInfo, setUploadedFileInfo] = useState<{ name: string; size: string } | null>(null);
 
   React.useEffect(() => {
     if (homepageTexts) {
@@ -1091,13 +1100,12 @@ export default function AdminPanel({ games, reservations, blockedTables, onRefre
               
               <div className="flex flex-col sm:flex-row gap-5 items-center">
                 <div className="w-16 h-16 rounded-xl bg-soccer-dark border border-soccer-field/90 flex items-center justify-center overflow-hidden shrink-0 shadow-inner">
-                  {textLogoUrl ? (
-                    <img src={getDirectImageUrl(textLogoUrl)} alt="Logo Preview" className="w-full h-full object-contain p-1.5" />
-                  ) : (
-                    <div className="w-10 h-10 bg-gradient-to-br from-[#EAB308] to-[#F97316] rounded-lg flex items-center justify-center font-display font-black text-[#041004] text-lg select-none">
-                      Q
-                    </div>
-                  )}
+                  <LogoImage 
+                    logoUrl={textLogoUrl} 
+                    alt="Logo Preview" 
+                    className="w-full h-full object-contain p-1.5" 
+                    fallbackType="admin" 
+                  />
                 </div>
                 
                 <div className="flex-grow w-full space-y-3 text-left">
@@ -1109,20 +1117,130 @@ export default function AdminPanel({ games, reservations, blockedTables, onRefre
                           type="file" 
                           accept="image/*" 
                           className="hidden" 
-                          onChange={(e) => {
+                          onChange={async (e) => {
                             const file = e.target.files?.[0];
                             if (file) {
-                              if (file.size > 800 * 1024) {
-                                alert("Selecione uma imagem menor de 800KB para garantir um carregamento ultrarrápido.");
-                                return;
-                              }
-                              const reader = new FileReader();
-                              reader.onloadend = () => {
-                                if (reader.result && typeof reader.result === "string") {
-                                  setTextLogoUrl(reader.result);
+                              setUploadStatus("uploading");
+                              setUploadProgress(0);
+                              setUploadError("");
+                              setFirebaseResponse("Validando e otimizando imagem...");
+                              
+                              try {
+                                const allowedTypes = ["image/png", "image/jpeg", "image/jpg", "image/webp", "image/svg+xml"];
+                                const fileExtension = file.name.split('.').pop()?.toLowerCase() || 'png';
+                                const allowedExtensions = ["png", "jpg", "jpeg", "webp", "svg"];
+
+                                if (!allowedTypes.includes(file.type) && !allowedExtensions.includes(fileExtension)) {
+                                  throw new Error("Formato não permitido! Selecione uma imagem .png, .jpg, .jpeg, .webp, ou .svg");
                                 }
-                              };
-                              reader.readAsDataURL(file);
+
+                                if (file.size > 5 * 1024 * 1024) {
+                                  throw new Error("A imagem é muito grande! Escolha um arquivo de no máximo 5MB.");
+                                }
+
+                                // Store user-selected filename and raw format dimensions
+                                const originalSizeFormatted = (file.size / 1024).toFixed(1) + " KB";
+                                setUploadedFileInfo({
+                                  name: file.name,
+                                  size: originalSizeFormatted
+                                });
+
+                                let fileToUpload: File | Blob = file;
+
+                                // Compress JPEGs/PNGs client-side using a Canvas helper to save load time & bandwidth
+                                if (fileExtension !== "svg" && file.type !== "image/svg+xml") {
+                                  setFirebaseResponse("Otimizando dimensões para carregamento instantâneo...");
+                                  try {
+                                    fileToUpload = await new Promise<File | Blob>((resolve) => {
+                                      const reader = new FileReader();
+                                      reader.onload = (event) => {
+                                        const img = new Image();
+                                        img.onload = () => {
+                                          const canvas = document.createElement("canvas");
+                                          let width = img.width;
+                                          let height = img.height;
+                                          
+                                          const MAX_BOUND = 1000;
+                                          if (width > MAX_BOUND || height > MAX_BOUND) {
+                                            if (width > height) {
+                                              height = Math.round((height * MAX_BOUND) / width);
+                                              width = MAX_BOUND;
+                                            } else {
+                                              width = Math.round((width * MAX_BOUND) / height);
+                                              height = MAX_BOUND;
+                                            }
+                                          }
+                                          
+                                          canvas.width = width;
+                                          canvas.height = height;
+                                          const ctx = canvas.getContext("2d");
+                                          if (ctx) {
+                                            ctx.drawImage(img, 0, 0, width, height);
+                                            const outputType = file.type === "image/png" ? "image/png" : "image/jpeg";
+                                            canvas.toBlob((blob) => {
+                                              if (blob) {
+                                                const compressedFile = new File([blob], file.name, { type: outputType });
+                                                // Update info with optimized weight
+                                                setUploadedFileInfo({
+                                                  name: file.name,
+                                                  size: `${originalSizeFormatted} (Oposto: ${(blob.size / 1024).toFixed(1)} KB)`
+                                                });
+                                                resolve(compressedFile);
+                                              } else {
+                                                resolve(file);
+                                              }
+                                            }, outputType, 0.85);
+                                          } else {
+                                            resolve(file);
+                                          }
+                                        };
+                                        img.onerror = () => resolve(file);
+                                        img.src = event.target?.result as string;
+                                      };
+                                      reader.onerror = () => resolve(file);
+                                      reader.readAsDataURL(file);
+                                    });
+                                  } catch (err) {
+                                    console.warn("Falha na compressão automática, usando arquivo original:", err);
+                                  }
+                                }
+
+                                setFirebaseResponse("Iniciando upload para o Firebase Storage...");
+                                // Target folder 'settings/' with file name 'logo-evento' as mandated
+                                const storageRef = ref(storage, `settings/logo-evento.${fileExtension}`);
+                                const uploadTask = uploadBytesResumable(storageRef, fileToUpload);
+                                
+                                uploadTask.on('state_changed', 
+                                  (snapshot) => {
+                                    const progress = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
+                                    setUploadProgress(progress);
+                                    setFirebaseResponse(`Enviando ao Storage: ${progress}% concluído.`);
+                                  }, 
+                                  (error) => {
+                                    console.error("Erro Firebase Storage:", error);
+                                    setUploadStatus("error");
+                                    setUploadError(error.message);
+                                  }, 
+                                  async () => {
+                                    try {
+                                      const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+                                      setUploadStatus("success");
+                                      setTextLogoUrl(downloadURL);
+                                      setFirebaseResponse("Logo salva e atualizada com sucesso no Firestore em tempo real!");
+                                      
+                                      // Real-time Firestore document update
+                                      const docRef = doc(db, "settings", "homepage");
+                                      await updateDoc(docRef, { logoUrl: downloadURL });
+                                    } catch (err: any) {
+                                      setUploadStatus("error");
+                                      setUploadError(err.message);
+                                    }
+                                  }
+                                );
+                              } catch (err: any) {
+                                setUploadStatus("error");
+                                setUploadError(err.message);
+                              }
                             }
                           }}
                         />
@@ -1131,7 +1249,20 @@ export default function AdminPanel({ games, reservations, blockedTables, onRefre
                       {textLogoUrl && (
                         <button
                           type="button"
-                          onClick={() => setTextLogoUrl("")}
+                          onClick={async () => {
+                            setTextLogoUrl("");
+                            setUploadStatus("idle");
+                            setUploadError("");
+                            setUploadedFileInfo(null);
+                            setFirebaseResponse("Logotipo removido.");
+                            try {
+                              // Real-time Firestore document wipe
+                              const docRef = doc(db, "settings", "homepage");
+                              await updateDoc(docRef, { logoUrl: "" });
+                            } catch (err: any) {
+                              console.error("Erro ao apagar logo do Firestore:", err);
+                            }
+                          }}
                           className="px-4 py-2 bg-red-950/40 hover:bg-red-900/60 text-red-300 border border-red-900/50 rounded-xl text-xs font-mono cursor-pointer transition-all"
                         >
                           Remover Logotipo
@@ -1140,17 +1271,92 @@ export default function AdminPanel({ games, reservations, blockedTables, onRefre
                     </div>
 
                     <div className="space-y-1">
-                      <label className="block text-[10px] font-mono text-soccer-cream/50 uppercase">Ou cole o link da imagem (ex: Imgur ou Web)</label>
+                      <label className="block text-[10px] font-mono text-soccer-cream/50 uppercase">Ou use um link manual direto</label>
                       <input 
                         type="text"
                         value={textLogoUrl}
-                        onChange={(e) => setTextLogoUrl(e.target.value)}
-                        placeholder="Cole aqui a URL da imagem (suporta álbuns do Imgur)"
+                        onChange={async (e) => {
+                          const val = e.target.value;
+                          setTextLogoUrl(val);
+                          if (val && !isValidDirectImageUrl(val)) {
+                            setUploadStatus("error");
+                            setUploadError("A URL inserida não termina com uma extensão de imagem válida (.png, .jpg, .jpeg, .webp, .svg).");
+                          } else {
+                            if (uploadStatus === "error") {
+                              setUploadStatus("success");
+                              setUploadError("");
+                            }
+                            try {
+                              const docRef = doc(db, "settings", "homepage");
+                              await updateDoc(docRef, { logoUrl: val });
+                            } catch (err: any) {
+                              console.error("Erro ao salvar URL manual:", err);
+                            }
+                          }
+                        }}
+                        placeholder="Ex: https://dominio.com/logo.png"
                         className="w-full bg-[#051c0f] border border-soccer-field text-xs text-soccer-cream rounded-xl px-3 py-2 outline-none focus:border-soccer-gold font-sans"
                       />
                     </div>
                   </div>
-                  <p className="text-[10px] text-soccer-cream/45 font-mono leading-tight">Formatos suportados: PNG, JPG ou WEBP. Pastas e links do Imgur são corrigidos automaticamente (como https://imgur.com/a/OkHeB0D convertido para https://i.imgur.com/OkHeB0D.png).</p>
+
+                  {/* MONITOR DE LOGOTIPO & FIREBASE STORAGE */}
+                  {(uploadStatus !== "idle" || textLogoUrl) && (
+                    <div className="mt-4 p-4 rounded-xl bg-[#03140a] border border-soccer-field/30 space-y-2.5 text-left">
+                      <div className="flex items-center justify-between border-b border-soccer-field/20 pb-1.5">
+                        <span className="text-soccer-gold font-sans font-bold uppercase text-[10px] tracking-wider">📦 Status do Logotipo</span>
+                        <span className="text-[9px] font-mono text-soccer-cream/50">Auto-sincronizado</span>
+                      </div>
+
+                      <div className="space-y-2 text-xs text-soccer-cream">
+                        {/* File Details: Name & Size */}
+                        {uploadedFileInfo && (
+                          <div className="text-[11px] bg-[#020e06] border border-soccer-field/15 p-2 rounded-lg text-soccer-cream/90 flex flex-col gap-0.5 font-mono">
+                            <div><span className="text-soccer-gold font-sans uppercase text-[9px] font-bold">Arquivo:</span> {uploadedFileInfo.name}</div>
+                            <div><span className="text-soccer-gold font-sans uppercase text-[9px] font-bold">Tamanho:</span> {uploadedFileInfo.size}</div>
+                          </div>
+                        )}
+
+                        {uploadStatus === "uploading" && (
+                          <div className="space-y-1.5">
+                            <div className="flex justify-between items-center text-[10px]">
+                              <span className="text-amber-400 font-bold animate-pulse">Enviando imagem otimizada...</span>
+                              <span className="font-mono">{uploadProgress}%</span>
+                            </div>
+                            <div className="w-full bg-[#020e06] rounded-full h-1 overflow-hidden">
+                              <div className="bg-soccer-gold h-1 rounded-full transition-all duration-300" style={{ width: `${uploadProgress}%` }}></div>
+                            </div>
+                          </div>
+                        )}
+
+                        {uploadStatus === "success" && (
+                          <div className="p-2.5 rounded-lg bg-emerald-950/40 border border-emerald-500/30 text-emerald-300 text-[11px] leading-relaxed">
+                            <span className="font-bold flex items-center gap-1.5 text-emerald-400 mb-0.5">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping inline-block" />
+                              ✨ Logo atualizada com sucesso!
+                            </span>
+                            Salvo e atualizado automaticamente no Firestore em tempo real. Os visitantes já veem a nova logo.
+                          </div>
+                        )}
+
+                        {uploadStatus === "error" && uploadError && (
+                          <div className="p-2.5 rounded-lg bg-red-950/40 border border-red-500/30 text-red-300 text-[11px]">
+                            <span className="font-bold block mb-0.5 text-red-400">⚠️ Erro no Upload:</span>
+                            {uploadError}
+                          </div>
+                        )}
+
+                        {textLogoUrl && (
+                          <div className="text-[10px] font-mono bg-[#020e06] border border-soccer-field/15 p-2 rounded break-all text-soccer-cream/80 space-y-1">
+                            <span className="text-soccer-gold font-sans font-bold uppercase text-[8px] tracking-wider block">URL Ativa da Imagem (Firestore):</span>
+                            <span className="select-all block text-zinc-300">{textLogoUrl}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  <p className="text-[10px] text-soccer-cream/45 font-mono leading-tight">Formatos permitidos: .PNG, .JPG, .JPEG, .WEBP, .SVG. Imagens enviadas são carregadas no Firebase Storage; links manuais devem referenciar o arquivo de imagem diretamente.</p>
                 </div>
               </div>
             </div>

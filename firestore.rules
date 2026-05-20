@@ -40,6 +40,12 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // Homepage and branding settings are viewable by anyone, editable only by admins
+    match /settings/{settingsId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
     // Admins metadata collection
     match /admins/{adminId} {
       allow read, write: if isAdmin();

@@ -1,10 +1,9 @@
 {
-  "projectId": "reservas-34cf4",
-  "appId": "1:736022942925:web:4670d6b057d30efe8d8584",
-  "apiKey": "AIzaSyDDF6zBb-hJDa4yqXXxfG-yWvNlySMmnY4",
-  "authDomain": "reservas-34cf4.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-398a270b-78a3-408b-9ac9-7aca7526146e",
-  "storageBucket": "reservas-34cf4.firebasestorage.app",
-  "messagingSenderId": "736022942925",
-  "measurementId": ""
+  "projectId": "copaco-18b74",
+  "appId": "1:900895081459:web:231f24cc38a0f38f634886",
+  "apiKey": "AIzaSyDj-WznI5LbK1juYr3fVCPZnveT5E9pcOA",
+  "authDomain": "copaco-18b74.firebaseapp.com",
+  "storageBucket": "copaco-18b74.appspot.com",
+  "messagingSenderId": "900895081459",
+  "measurementId": "G-M20EB9ZMXH"
 }

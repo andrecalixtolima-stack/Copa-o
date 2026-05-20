@@ -6,16 +6,23 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore, doc, getDocFromServer } from "firebase/firestore";
+import { getStorage } from "firebase/storage";
 import firebaseConfig from "../firebase-applet-config.json";
 
 // Initialize Firebase SDK
 const app = initializeApp(firebaseConfig);
 
 // Initialize Firestore database instance
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+const customDbId = (firebaseConfig as any).firestoreDatabaseId;
+export const db = customDbId && customDbId !== "(default)" 
+  ? getFirestore(app, customDbId) 
+  : getFirestore(app);
 
 // Initialize Authentication handlers
 export const auth = getAuth(app);
+
+// Initialize Firebase Storage instance
+export const storage = getStorage(app);
 
 // Check Connectivity to Firebase
 async function testConnection() {

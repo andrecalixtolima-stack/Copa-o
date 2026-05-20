@@ -11,6 +11,7 @@ import Header from "./components/Header";
 import MatchList from "./components/MatchList";
 import ReservationModal from "./components/ReservationModal";
 import AdminPanel from "./components/AdminPanel";
+import LogoImage from "./components/LogoImage";
 import { 
   Tv, Music, Beer, Trophy, Gift, Users2, Sparkles, HelpCircle, Star, Sparkle, RefreshCw, Eye 
 } from "lucide-react";
@@ -44,6 +45,7 @@ export default function App() {
   const [selectedGame, setSelectedGame] = useState<Game | null>(null);
 
   const [seeding, setSeeding] = useState(false);
+  const [connectionError, setConnectionError] = useState<{ message: string; code?: string; path?: string } | null>(null);
 
   // Subscribe to real-time collections
   useEffect(() => {
@@ -57,9 +59,19 @@ export default function App() {
           list.push({ id: doc.id, ...doc.data() } as Game);
         });
         setGames(list);
+        setConnectionError(null);
         setLoading(false);
       },
-      (err) => handleFirestoreError(err, OperationType.GET, "games")
+      (err) => {
+        console.error("onSnapshot error in collection 'games':", err);
+        setConnectionError({ message: err.message, code: (err as any).code, path: "games" });
+        setLoading(false);
+        try {
+          handleFirestoreError(err, OperationType.GET, "games");
+        } catch (e) {
+          console.warn("Muted error throw inside games onSnapshot callback to maintain React rendering context.");
+        }
+      }
     );
 
     const unsubReservations = onSnapshot(
@@ -70,8 +82,17 @@ export default function App() {
           list.push({ id: doc.id, ...doc.data() } as Reservation);
         });
         setReservations(list);
+        setConnectionError(null);
       },
-      (err) => handleFirestoreError(err, OperationType.GET, "reservations")
+      (err) => {
+        console.error("onSnapshot error in collection 'reservations':", err);
+        setConnectionError({ message: err.message, code: (err as any).code, path: "reservations" });
+        try {
+          handleFirestoreError(err, OperationType.GET, "reservations");
+        } catch (e) {
+          console.warn("Muted error throw inside reservations onSnapshot callback to maintain React rendering context.");
+        }
+      }
     );
 
     const unsubBlocks = onSnapshot(
@@ -82,8 +103,17 @@ export default function App() {
           list.push({ id: doc.id, ...doc.data() } as BlockedTable);
         });
         setBlockedTables(list);
+        setConnectionError(null);
       },
-      (err) => handleFirestoreError(err, OperationType.GET, "blockedTables")
+      (err) => {
+        console.error("onSnapshot error in collection 'blockedTables':", err);
+        setConnectionError({ message: err.message, code: (err as any).code, path: "blockedTables" });
+        try {
+          handleFirestoreError(err, OperationType.GET, "blockedTables");
+        } catch (e) {
+          console.warn("Muted error throw inside blockedTables onSnapshot callback to maintain React rendering context.");
+        }
+      }
     );
 
     const unsubTexts = onSnapshot(
@@ -92,8 +122,12 @@ export default function App() {
         if (snap.exists()) {
           setHomepageTexts(snap.data() as HomepageSettings);
         }
+        setConnectionError(null);
       },
-      (err) => console.warn("Error loading homepage settings:", err)
+      (err) => {
+        console.warn("Error loading homepage settings:", err);
+        // Do not fail the whole page if settings are missing
+      }
     );
 
     return () => {
@@ -179,6 +213,40 @@ export default function App() {
       {/* Main Core Layout wrapping client space */}
       <main className="relative z-10 flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12 space-y-16">
         
+        {/* Connection Error Advisor Banner */}
+        {connectionError && (
+          <div id="firebase_not_found_advisor" className="p-6 bg-gradient-to-r from-red-950/40 to-amber-950/30 border-2 border-amber-500/20 rounded-3xl space-y-4 max-w-3xl mx-auto shadow-xl relative overflow-hidden backdrop-blur-md">
+            <div className="absolute top-0 right-0 p-3 opacity-10">
+              <RefreshCw className="w-16 h-16 text-amber-500 animate-spin-slow" />
+            </div>
+            <div className="flex items-start gap-4">
+              <div className="bg-amber-500/20 p-2.5 rounded-2xl border border-amber-500/30 text-amber-400 shrink-0">
+                <HelpCircle className="w-6 h-6 animate-pulse" />
+              </div>
+              <div className="space-y-1.5 flex-1 text-left">
+                <h3 className="font-display font-black text-lg text-amber-400 uppercase tracking-tight">O Firestore precisa ser inicializado no Google Cloud</h3>
+                <p className="text-xs text-white/80 leading-relaxed font-sans mt-1">
+                  Identificamos uma restrição de resposta do Firebase: <code className="font-mono text-amber-200 select-all font-bold">Code 5 (NOT_FOUND)</code> na coleção <code className="font-mono bg-black/40 px-1 rounded text-soccer-gold">"{connectionError.path || "settings"}"</code>. Isso ocorre quando o banco de dados do seu projeto do Google Cloud <code className="font-mono bg-black/40 px-1.5 py-0.5 rounded text-soccer-gold">copaco-18b74</code> ainda não foi inicializado no console.
+                </p>
+              </div>
+            </div>
+            
+            <div className="bg-black/30 rounded-2xl p-4 border border-white/5 space-y-3.5 text-left">
+              <div className="text-[11px] font-mono text-soccer-gold font-bold uppercase tracking-wider">Passo a Passo para Ativar o Banco (Menos de 1 Minuto):</div>
+              <ol className="text-[11px] text-white/70 space-y-2 list-decimal list-inside font-sans leading-relaxed">
+                <li>Acesse o seu Painel do Firestore clicando no link direto: <a href="https://console.firebase.google.com/project/copaco-18b74/firestore" target="_blank" rel="noopener noreferrer" className="text-soccer-gold underline hover:text-yellow-300 font-bold inline-flex items-center gap-1">console.firebase.google.com/project/copaco-18b74/firestore <Eye className="w-3.5 h-3.5 inline" /></a></li>
+                <li>Clique no botão <strong className="text-white">"Criar banco de dados"</strong> (ou "Create database").</li>
+                <li>Mantenha o ID do banco fixado como o valor padrão <code className="font-mono text-white bg-white/10 px-1 rounded">(default)</code>.</li>
+                <li>Escolha a região física do seu servidor (ex: <code className="font-mono text-white bg-white/10 px-1 rounded">southamerica-east1</code> ou <code className="font-mono text-white bg-white/10 px-1 rounded">us-central</code>) e clique em prosseguir.</li>
+                <li>Inicie o banco em modo teste (para regras livres temporárias) ou modo de produção para aplicar as regras prontas e seguras.</li>
+              </ol>
+              <div className="text-[10px] text-zinc-400 font-sans leading-relaxed pt-1.5 border-t border-white/5">
+                💡 <strong>Dica de Sincronia:</strong> Assim que você o inicializar no console da Firebase, o aplicativo vai se conectar e carregar a tela principal automaticamente em tempo real sem precisar de novo build ou re-deploy!
+              </div>
+            </div>
+          </div>
+        )}
+        
         {/* HERO HEADER */}
         <section id="hero_section" className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-soccer-dark/90 via-soccer-field/40 to-black/80 border border-white/10 p-8 md:p-12 text-center space-y-6 shadow-2xl backdrop-blur-md">
           
@@ -199,23 +267,23 @@ export default function App() {
                 <div className="absolute -inset-2 bg-gradient-to-r from-soccer-gold via-soccer-orange to-yellow-500 rounded-3xl blur-xl opacity-30 group-hover:opacity-50 transition duration-700 pointer-events-none"></div>
                 
                 <div id="hero_logo_container" className="relative p-4 sm:p-6 bg-black/40 border border-white/10 rounded-3xl flex items-center justify-center shadow-2xl backdrop-blur-md max-w-[280px] sm:max-w-[340px] mx-auto">
-                  <img 
-                    src={getDirectImageUrl(homepageTexts.logoUrl)} 
-                    alt="Logo Oficial Copaço" 
-                    className="h-32 sm:h-40 md:h-48 w-auto object-contain transition-transform duration-500 group-hover:scale-105" 
+                  <LogoImage 
+                    logoUrl={homepageTexts.logoUrl}
+                    alt="Logo Oficial Copaço"
+                    className="h-32 sm:h-40 md:h-48 w-auto object-contain transition-transform duration-500 group-hover:scale-105"
+                    fallbackType="hero"
                   />
                 </div>
               </div>
             </div>
           ) : (
             /* Elegant high-fidelity fallback when no logo is uploaded */
-            <div className="pt-2 flex justify-center">
-              <div className="relative inline-flex flex-col items-center p-6 rounded-2xl bg-white/5 border border-white/10 shadow-lg max-w-[240px]">
-                <Trophy className="w-10 h-10 text-soccer-gold animate-bounce mb-2" />
-                <span className="font-display font-black text-sm text-soccer-gold uppercase tracking-widest">COPAÇO</span>
-                <span className="font-mono text-[8px] text-soccer-cream/50 uppercase tracking-[0.2em] mt-0.5">Quinteiro Oficial</span>
-              </div>
-            </div>
+            <LogoImage 
+              logoUrl={undefined}
+              alt="Logo Fallback"
+              className=""
+              fallbackType="hero"
+            />
           )}
 
           <div className="space-y-3 max-w-3xl mx-auto">

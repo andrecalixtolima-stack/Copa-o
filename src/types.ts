@@ -83,38 +83,24 @@ export interface HomepageSettings {
   logoUrl?: string;
 }
 
+export function isValidDirectImageUrl(url: string | undefined): boolean {
+  if (!url) return false;
+  const cleanUrl = url.trim();
+  if (cleanUrl.startsWith("data:image/")) return true;
+  if (cleanUrl.includes("firebasestorage.googleapis.com")) return true;
+  
+  // Check if URL ends with common image extensions, ignoring query params
+  const urlWithoutParams = cleanUrl.split("?")[0].split("#")[0];
+  const extensionPattern = /\.(png|jpg|jpeg|webp|svg)$/i;
+  return extensionPattern.test(urlWithoutParams);
+}
+
 export function getDirectImageUrl(url: string | undefined): string {
   if (!url) return "";
   const cleanUrl = url.trim();
-  
-  // Convert standard Imgur patterns to direct image addresses
-  if (cleanUrl.includes("imgur.com")) {
-    if (cleanUrl.includes("i.imgur.com")) {
-      return cleanUrl;
-    }
-    // Match album format: imgur.com/a/{id}
-    const albumRegex = /imgur\.com\/a\/([a-zA-Z0-9]+)/;
-    const albumMatch = cleanUrl.match(albumRegex);
-    if (albumMatch && albumMatch[1]) {
-      return `https://i.imgur.com/${albumMatch[1]}.png`;
-    }
-    // Match gallery format: imgur.com/gallery/{id}
-    const galleryRegex = /imgur\.com\/gallery\/([a-zA-Z0-9]+)/;
-    const galleryMatch = cleanUrl.match(galleryRegex);
-    if (galleryMatch && galleryMatch[1]) {
-      return `https://i.imgur.com/${galleryMatch[1]}.png`;
-    }
-    // Match basic layout format: imgur.com/{id}
-    const basicRegex = /imgur\.com\/([a-zA-Z0-9]+)/;
-    const basicMatch = cleanUrl.match(basicRegex);
-    if (basicMatch && basicMatch[1]) {
-      // Avoid matching sub-pages like imgur.com/signin, imgur.com/upload
-      const reserved = ["signin", "upload", "register", "about", "help"];
-      if (!reserved.includes(basicMatch[1].toLowerCase())) {
-        return `https://i.imgur.com/${basicMatch[1]}.png`;
-      }
-    }
+  if (isValidDirectImageUrl(cleanUrl)) {
+    return cleanUrl;
   }
-  return cleanUrl;
+  return "";
 }
 

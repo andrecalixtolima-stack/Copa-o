@@ -14,6 +14,7 @@ import {
 } from "firebase/auth";
 import { Shield, LogIn, LogOut, Ticket, Star, X } from "lucide-react";
 import { HomepageSettings, getDirectImageUrl } from "../types";
+import LogoImage from "./LogoImage";
 
 interface HeaderProps {
   isAdminMode: boolean;
@@ -93,17 +94,12 @@ export default function Header({ isAdminMode, onToggleAdminMode, homepageTexts }
           
           {/* Logo & Branding */}
           <div className="flex items-center gap-4">
-            {homepageTexts?.logoUrl ? (
-              <img 
-                src={getDirectImageUrl(homepageTexts.logoUrl)} 
-                alt="Logo Copaço" 
-                className="w-12 h-12 rounded-xl object-contain bg-white/5 border border-white/10 p-1 shadow-lg shadow-orange-500/10"
-              />
-            ) : (
-              <div className="w-12 h-12 bg-gradient-to-br from-[#EAB308] to-[#F97316] rounded-xl flex items-center justify-center shadow-lg shadow-orange-500/20 font-display font-black text-[#041004] text-2xl cursor-pointer select-none">
-                Q
-              </div>
-            )}
+            <LogoImage 
+              logoUrl={homepageTexts?.logoUrl} 
+              alt="Logo Copaço" 
+              className="w-12 h-12 rounded-xl object-contain bg-white/5 border border-white/10 p-1 shadow-lg shadow-orange-500/10"
+              fallbackType="header"
+            />
             <div>
               <div className="flex items-center gap-1.5">
                 <span className="font-display font-black text-soccer-cream text-xl tracking-tighter uppercase leading-none">
@@ -120,8 +116,17 @@ export default function Header({ isAdminMode, onToggleAdminMode, homepageTexts }
           <div className="hidden md:flex items-center gap-2 bg-white/5 px-4 py-2 rounded-full border border-white/10 hover:bg-white/10 transition-all">
             <Ticket className="w-4 h-4 text-soccer-gold animate-pulse" />
             <span className="text-xs text-white/80 font-medium font-sans">
-              Toda reserva garante acesso à transmissão por telão!
+              Toda reserva garante acesso ao telão principal!
             </span>
+          </div>
+
+          {/* Realtime Synchronized Badge */}
+          <div className="hidden sm:flex items-center gap-2 bg-emerald-950/30 border border-emerald-500/20 px-3 py-1.5 rounded-full text-emerald-400 font-mono text-[10px] uppercase tracking-widest font-bold">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
+            </span>
+            <span>Realtime</span>
           </div>
 
           {/* Action Area */}
