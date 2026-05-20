@@ -4,7 +4,7 @@
  */
 
 import React, { useState } from "react";
-import { Game, Reservation, BlockedTable, DashboardMetrics, ReservationStatus, HomepageSettings } from "../types";
+import { Game, Reservation, BlockedTable, DashboardMetrics, ReservationStatus, HomepageSettings, getDirectImageUrl } from "../types";
 import { db, handleFirestoreError, OperationType } from "../firebase";
 import { 
   collection, addDoc, updateDoc, deleteDoc, doc, writeBatch, setDoc
@@ -63,6 +63,7 @@ export default function AdminPanel({ games, reservations, blockedTables, onRefre
   const [textS3Desc, setTextS3Desc] = useState("");
   const [textS4Title, setTextS4Title] = useState("");
   const [textS4Desc, setTextS4Desc] = useState("");
+  const [textLogoUrl, setTextLogoUrl] = useState("");
 
   React.useEffect(() => {
     if (homepageTexts) {
@@ -81,6 +82,7 @@ export default function AdminPanel({ games, reservations, blockedTables, onRefre
       setTextS3Desc(homepageTexts.station3Desc || "");
       setTextS4Title(homepageTexts.station4Title || "");
       setTextS4Desc(homepageTexts.station4Desc || "");
+      setTextLogoUrl(homepageTexts.logoUrl || "");
     }
   }, [homepageTexts]);
 
@@ -105,8 +107,9 @@ export default function AdminPanel({ games, reservations, blockedTables, onRefre
         station3Desc: textS3Desc.trim(),
         station4Title: textS4Title.trim(),
         station4Desc: textS4Desc.trim(),
+        logoUrl: textLogoUrl,
       });
-      showFeedback("Textos da página principal atualizados com sucesso!");
+      showFeedback("Textos da página principal e logotipo atualizados com sucesso!");
     } catch (err: any) {
       handleFirestoreError(err, OperationType.WRITE, "settings/homepage");
     } finally {
@@ -1075,6 +1078,82 @@ export default function AdminPanel({ games, reservations, blockedTables, onRefre
           </div>
 
           <div className="border-t border-soccer-field/30 pt-6 space-y-6">
+
+            {/* Upload de Logotipo */}
+            <div className="bg-[#051c0f]/65 border border-soccer-field/50 p-5 rounded-2xl space-y-4">
+              <h4 className="text-xs uppercase font-mono text-soccer-gold font-bold tracking-wider flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 bg-soccer-gold rounded-full animate-ping" />
+                Logotipo do Evento (Upload de Imagem)
+              </h4>
+              <p className="text-[11px] text-soccer-cream/70 leading-relaxed">
+                Adicione a logo oficial da sua marca ou patrocinador para dar um toque autêntico ao Copaço. Ela substituirá o ícone default no cabeçalho do site.
+              </p>
+              
+              <div className="flex flex-col sm:flex-row gap-5 items-center">
+                <div className="w-16 h-16 rounded-xl bg-soccer-dark border border-soccer-field/90 flex items-center justify-center overflow-hidden shrink-0 shadow-inner">
+                  {textLogoUrl ? (
+                    <img src={getDirectImageUrl(textLogoUrl)} alt="Logo Preview" className="w-full h-full object-contain p-1.5" />
+                  ) : (
+                    <div className="w-10 h-10 bg-gradient-to-br from-[#EAB308] to-[#F97316] rounded-lg flex items-center justify-center font-display font-black text-[#041004] text-lg select-none">
+                      Q
+                    </div>
+                  )}
+                </div>
+                
+                <div className="flex-grow w-full space-y-3 text-left">
+                  <div className="flex flex-col gap-2">
+                    <div className="flex flex-wrap gap-2">
+                      <label className="px-4 py-2 bg-[#051c0f] border border-soccer-field hover:border-soccer-gold text-soccer-cream rounded-xl text-xs font-mono font-bold cursor-pointer transition-all hover:bg-[#072413] inline-block">
+                        <span>Fazer Upload</span>
+                        <input 
+                          type="file" 
+                          accept="image/*" 
+                          className="hidden" 
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              if (file.size > 800 * 1024) {
+                                alert("Selecione uma imagem menor de 800KB para garantir um carregamento ultrarrápido.");
+                                return;
+                              }
+                              const reader = new FileReader();
+                              reader.onloadend = () => {
+                                if (reader.result && typeof reader.result === "string") {
+                                  setTextLogoUrl(reader.result);
+                                }
+                              };
+                              reader.readAsDataURL(file);
+                            }
+                          }}
+                        />
+                      </label>
+                      
+                      {textLogoUrl && (
+                        <button
+                          type="button"
+                          onClick={() => setTextLogoUrl("")}
+                          className="px-4 py-2 bg-red-950/40 hover:bg-red-900/60 text-red-300 border border-red-900/50 rounded-xl text-xs font-mono cursor-pointer transition-all"
+                        >
+                          Remover Logotipo
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="block text-[10px] font-mono text-soccer-cream/50 uppercase">Ou cole o link da imagem (ex: Imgur ou Web)</label>
+                      <input 
+                        type="text"
+                        value={textLogoUrl}
+                        onChange={(e) => setTextLogoUrl(e.target.value)}
+                        placeholder="Cole aqui a URL da imagem (suporta álbuns do Imgur)"
+                        className="w-full bg-[#051c0f] border border-soccer-field text-xs text-soccer-cream rounded-xl px-3 py-2 outline-none focus:border-soccer-gold font-sans"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-soccer-cream/45 font-mono leading-tight">Formatos suportados: PNG, JPG ou WEBP. Pastas e links do Imgur são corrigidos automaticamente (como https://imgur.com/a/OkHeB0D convertido para https://i.imgur.com/OkHeB0D.png).</p>
+                </div>
+              </div>
+            </div>
             
             {/* Secção Hero */}
             <div className="space-y-4">

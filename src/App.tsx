@@ -6,7 +6,7 @@
 import React, { useState, useEffect } from "react";
 import { db, handleFirestoreError, OperationType } from "./firebase";
 import { collection, onSnapshot, addDoc, doc } from "firebase/firestore";
-import { Game, Reservation, BlockedTable, HomepageSettings } from "./types";
+import { Game, Reservation, BlockedTable, HomepageSettings, getDirectImageUrl } from "./types";
 import Header from "./components/Header";
 import MatchList from "./components/MatchList";
 import ReservationModal from "./components/ReservationModal";
@@ -25,7 +25,7 @@ export default function App() {
     badgeText: "EXCLUSIVIDADE DE COPA • Vagas Limitadas",
     heroTitlePart1: "VIVA A ENERGIA DA",
     heroTitleHighlight: "NOSSA TORCIDA",
-    heroDescription: "Reserve sua mesa e garanta acesso à área com transmissão por telão. O clima frenético de torcida com a gastronomia e o conforto do Quinteiro.",
+    heroDescription: "Reserve sua mesa e viva a energia da torcida no telão principal do Quinteiro. Um espaço com segurança, conforto, boa comida, bebida gelada e aquela atmosfera que transforma cada jogo em celebração.",
     telaoBannerText: "Toda reserva garante acesso à área de transmissão por telão",
     stationSectionTitle: "O QUE ACONTECE NO COPAÇO",
     stationSectionSubtitle: "A energia eletrizante dos gramados com a infraestrutura e o conforto do Quinteiro.",
@@ -174,7 +174,7 @@ export default function App() {
       </div>
 
       {/* Navigation Header */}
-      <Header isAdminMode={isAdminMode} onToggleAdminMode={setIsAdminMode} />
+      <Header isAdminMode={isAdminMode} onToggleAdminMode={setIsAdminMode} homepageTexts={homepageTexts} />
 
       {/* Main Core Layout wrapping client space */}
       <main className="relative z-10 flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12 space-y-16">
@@ -191,6 +191,33 @@ export default function App() {
             <span>{homepageTexts.badgeText}</span>
           </div>
 
+          {/* Logo do Evento com Proporção de Destaque no Topo do Banner */}
+          {homepageTexts.logoUrl ? (
+            <div className="pt-2 flex justify-center animate-fade-in">
+              <div className="relative group">
+                {/* Glowing neon backdrop to highlight the event crest */}
+                <div className="absolute -inset-2 bg-gradient-to-r from-soccer-gold via-soccer-orange to-yellow-500 rounded-3xl blur-xl opacity-30 group-hover:opacity-50 transition duration-700 pointer-events-none"></div>
+                
+                <div id="hero_logo_container" className="relative p-4 sm:p-6 bg-black/40 border border-white/10 rounded-3xl flex items-center justify-center shadow-2xl backdrop-blur-md max-w-[280px] sm:max-w-[340px] mx-auto">
+                  <img 
+                    src={getDirectImageUrl(homepageTexts.logoUrl)} 
+                    alt="Logo Oficial Copaço" 
+                    className="h-32 sm:h-40 md:h-48 w-auto object-contain transition-transform duration-500 group-hover:scale-105" 
+                  />
+                </div>
+              </div>
+            </div>
+          ) : (
+            /* Elegant high-fidelity fallback when no logo is uploaded */
+            <div className="pt-2 flex justify-center">
+              <div className="relative inline-flex flex-col items-center p-6 rounded-2xl bg-white/5 border border-white/10 shadow-lg max-w-[240px]">
+                <Trophy className="w-10 h-10 text-soccer-gold animate-bounce mb-2" />
+                <span className="font-display font-black text-sm text-soccer-gold uppercase tracking-widest">COPAÇO</span>
+                <span className="font-mono text-[8px] text-soccer-cream/50 uppercase tracking-[0.2em] mt-0.5">Quinteiro Oficial</span>
+              </div>
+            </div>
+          )}
+
           <div className="space-y-3 max-w-3xl mx-auto">
             <h1 className="text-5xl sm:text-6xl md:text-7xl font-display font-black tracking-tight leading-[0.95] text-soccer-cream uppercase">
               {homepageTexts.heroTitlePart1} <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#EAB308] to-[#F97316] select-none">{homepageTexts.heroTitleHighlight}</span>
@@ -205,13 +232,6 @@ export default function App() {
             <div className="flex items-center justify-center gap-2 text-soccer-gold font-display font-bold text-sm sm:text-base tracking-tight">
               <Tv className="w-5 h-5 text-soccer-gold shrink-0" />
               <span>{homepageTexts.telaoBannerText}</span>
-            </div>
-          </div>
-
-          {/* Empty Space filler for custom events logo */}
-          <div className="pt-2">
-            <div className="mx-auto w-36 h-12 bg-soccer-cream/5 border border-dashed border-soccer-cream/20 rounded-xl flex items-center justify-center text-[10px] uppercase tracking-wider text-soccer-cream/40 font-mono" title="Placeholder para a Logo do Evento">
-              [ Copaço Oficial ]
             </div>
           </div>
 

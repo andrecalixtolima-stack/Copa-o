@@ -13,13 +13,15 @@ import {
   User
 } from "firebase/auth";
 import { Shield, LogIn, LogOut, Ticket, Star, X } from "lucide-react";
+import { HomepageSettings, getDirectImageUrl } from "../types";
 
 interface HeaderProps {
   isAdminMode: boolean;
   onToggleAdminMode: (active: boolean) => void;
+  homepageTexts?: HomepageSettings;
 }
 
-export default function Header({ isAdminMode, onToggleAdminMode }: HeaderProps) {
+export default function Header({ isAdminMode, onToggleAdminMode, homepageTexts }: HeaderProps) {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [showLoginModal, setShowLoginModal] = useState(false);
@@ -91,9 +93,17 @@ export default function Header({ isAdminMode, onToggleAdminMode }: HeaderProps) 
           
           {/* Logo & Branding */}
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-gradient-to-br from-[#EAB308] to-[#F97316] rounded-xl flex items-center justify-center shadow-lg shadow-orange-500/20 font-display font-black text-[#041004] text-2xl cursor-pointer select-none">
-              Q
-            </div>
+            {homepageTexts?.logoUrl ? (
+              <img 
+                src={getDirectImageUrl(homepageTexts.logoUrl)} 
+                alt="Logo Copaço" 
+                className="w-12 h-12 rounded-xl object-contain bg-white/5 border border-white/10 p-1 shadow-lg shadow-orange-500/10"
+              />
+            ) : (
+              <div className="w-12 h-12 bg-gradient-to-br from-[#EAB308] to-[#F97316] rounded-xl flex items-center justify-center shadow-lg shadow-orange-500/20 font-display font-black text-[#041004] text-2xl cursor-pointer select-none">
+                Q
+              </div>
+            )}
             <div>
               <div className="flex items-center gap-1.5">
                 <span className="font-display font-black text-soccer-cream text-xl tracking-tighter uppercase leading-none">
