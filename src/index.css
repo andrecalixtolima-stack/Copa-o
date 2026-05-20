@@ -1,0 +1,52 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Space Grotesk", sans-serif;
+  --font-mono: "Fira Code", ui-monospace, SFMono-Regular, monospace;
+
+  /* Premium thematic colors requested */
+  --color-soccer-dark: #041004;     /* Deep forest black */
+  --color-soccer-field: #004d1a;    /* Rich green highlight */
+  --color-soccer-gold: #eab308;     /* Dynamic modern gold */
+  --color-soccer-orange: #f97316;   /* Energetic neon orange */
+  --color-soccer-neon: #ec4899;     /* Deep vibrant pink */
+  --color-soccer-cream: #f5f5f0;    /* Elegant Offwhite */
+}
+
+/* Custom glow animations and UI enhancements */
+@layer utilities {
+  .glow-soccer-gold {
+    box-shadow: 0 0 30px -3px rgba(234, 179, 8, 0.5);
+  }
+  .glow-soccer-neon {
+    box-shadow: 0 0 35px -4px rgba(236, 72, 153, 0.6);
+  }
+}
+
+body {
+  background-color: #041004;
+  color: #f5f5f0;
+  font-family: var(--font-sans);
+  overflow-x: hidden;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+}
+
+/* Custom modern scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #072212;
+}
+::-webkit-scrollbar-thumb {
+  background: #eab308;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #f97316;
+}

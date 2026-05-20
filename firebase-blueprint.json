@@ -1,0 +1,77 @@
+{
+  "entities": {
+    "Game": {
+      "title": "Game",
+      "description": "A World Cup match event designed for table bookings at Quinteiro",
+      "type": "object",
+      "properties": {
+        "homeTeam": { "type": "string", "description": "Home team name" },
+        "awayTeam": { "type": "string", "description": "Away team name" },
+        "dateTime": { "type": "string", "format": "date-time", "description": "ISO date and time of the match" },
+        "description": { "type": "string", "description": "Match description" },
+        "attractions": { "type": "string", "description": "Special attractions / music / acts during this match" },
+        "imageUrl": { "type": "string", "description": "URL of the game poster / graphic" },
+        "isBrazilGame": { "type": "boolean", "description": "True if this is a premium Brazil match (requires PIX payment)" },
+        "tablesTotal4": { "type": "number", "description": "Total number of 4-people tables available (default: 30)" },
+        "tablesTotal2": { "type": "number", "description": "Total number of 2-people tables available (default: 3)" },
+        "priceTable4": { "type": "number", "description": "Booking price for a 4-person table (default: 24)" },
+        "priceTable2": { "type": "number", "description": "Booking price for a 2-person table (default: 12)" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["homeTeam", "awayTeam", "dateTime", "isBrazilGame"]
+    },
+    "Reservation": {
+      "title": "Reservation",
+      "description": "A table reservation for a specific match",
+      "type": "object",
+      "properties": {
+        "gameId": { "type": "string", "description": "Associated game document key" },
+        "gameName": { "type": "string", "description": "Convenience name of the game (e.g. Brasil vs Serbia)" },
+        "gameDateTime": { "type": "string", "format": "date-time", "description": "Date time of the game for expiration processing" },
+        "isBrazilGame": { "type": "boolean", "description": "True if this was a paid reservation" },
+        "clientName": { "type": "string", "description": "Customer name" },
+        "clientPhone": { "type": "string", "description": "Customer WhatsApp phone number" },
+        "paxCount": { "type": "number", "description": "Number of people attending" },
+        "tableType": { "type": "string", "enum": ["mesa4", "mesa2"], "description": "Type of table selected" },
+        "tableNumber": { "type": "number", "description": "Allocated unique table number" },
+        "status": {
+          "type": "string",
+          "enum": ["aguardando comprovante", "confirmado", "cancelado", "liberada automaticamente", "ativa"],
+          "description": "Reservation status"
+        },
+        "paymentProofUrl": { "type": "string", "description": "Optional payment confirmation details / upload URL" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["gameId", "clientName", "clientPhone", "paxCount", "tableType", "tableNumber", "status"]
+    },
+    "BlockedTable": {
+      "title": "BlockedTable",
+      "description": "Representing tables manually blocked by the admin",
+      "type": "object",
+      "properties": {
+        "gameId": { "type": "string", "description": "Match ID" },
+        "tableType": { "type": "string", "enum": ["mesa4", "mesa2"] },
+        "tableNumber": { "type": "number", "description": "Number of the blocked table" },
+        "blockedBy": { "type": "string", "description": "Admin identity who blocked the table" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["gameId", "tableType", "tableNumber"]
+    }
+  },
+  "firestore": {
+    "/games/{gameId}": {
+      "schema": { "$ref": "#/entities/Game" },
+      "description": "World Cup match schedule and setup"
+    },
+    "/reservations/{reservationId}": {
+      "schema": { "$ref": "#/entities/Reservation" },
+      "description": "Client table reservations"
+    },
+    "/blockedTables/{blockedTableId}": {
+      "schema": { "$ref": "#/entities/BlockedTable" },
+      "description": "Tables blocked manually by administrators"
+    }
+  }
+}

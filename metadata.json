@@ -1,0 +1,8 @@
+{
+  "name": "COPAÇO no Quinteiro",
+  "description": "Sistema completo premium em tempo real para reservas de mesas durante os jogos da Copa do Mundo no Bar Quinteiro, contendo controle de acesso e recursos administrativos avançados.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

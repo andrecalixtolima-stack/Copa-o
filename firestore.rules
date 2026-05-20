@@ -1,0 +1,48 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default safe fallback rule
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Checking if user is Administrator based on known email or admins database collection
+    function isAdmin() {
+      return request.auth != null && (
+        request.auth.token.email == "andrecalixtolima@gmail.com" ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    // Games are viewable by anyone, editable only by admins
+    match /games/{gameId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Reservations are viewable by anyone (to check table occupancy in real time),
+    // writeable by clients making brand new bookings, and fully managed by admins.
+    // Additionally, unauthenticated clients can execute background expiration actions on free, stale games.
+    match /reservations/{reservationId} {
+      allow read: if true;
+      allow create: if true;
+      allow update: if isAdmin() || (
+        // Client-side self-healing backup: can set expired free reservations to released
+        request.resource.data.status == "liberada automaticamente" &&
+        resource.data.isBrazilGame == false
+      );
+      allow delete: if isAdmin();
+    }
+
+    // Blocked tables can be viewed by anyone, edited only by admins
+    match /blockedTables/{blockedId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Admins metadata collection
+    match /admins/{adminId} {
+      allow read, write: if isAdmin();
+    }
+  }
+}

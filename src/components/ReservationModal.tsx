@@ -1,0 +1,674 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import React, { useState, useEffect } from "react";
+import { Game, Reservation, BlockedTable } from "../types";
+import { db, handleFirestoreError, OperationType } from "../firebase";
+import { collection, addDoc, getDocs } from "firebase/firestore";
+import { 
+  X, Info, Phone, User, Users, Clipboard, ExternalLink, Check, AlertTriangle, HelpCircle, ChevronRight 
+} from "lucide-react";
+
+interface ReservationModalProps {
+  game: Game;
+  reservations: Reservation[];
+  blockedTables: BlockedTable[];
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+export default function ReservationModal({ 
+  game, 
+  reservations, 
+  blockedTables, 
+  onClose, 
+  onSuccess 
+}: ReservationModalProps) {
+  
+  const [step, setStep] = useState<"details" | "payment" | "success">("details");
+  
+  // Form coordinates
+  const [clientName, setClientName] = useState("");
+  const [clientPhone, setClientPhone] = useState("");
+  const [paxCount, setPaxCount] = useState<number>(4);
+  const [tableType, setTableType] = useState<"mesa4" | "mesa2">("mesa4");
+  const [selectedTableNumber, setSelectedTableNumber] = useState<number | null>(null);
+
+  const [loading, setLoading] = useState(false);
+  const [formError, setFormError] = useState("");
+  const [copied, setCopied] = useState(false);
+  const [createdReservation, setCreatedReservation] = useState<Reservation | null>(null);
+
+  // Filter occupied tables for this specific game
+  const activeReservationsForGame = reservations.filter(
+    r => r.gameId === game.id && r.status !== "cancelado" && r.status !== "liberada automaticamente"
+  );
+  
+  const blockedForGame = blockedTables.filter(b => b.gameId === game.id);
+
+  // When pax changes, auto limit tableType compatibility
+  useEffect(() => {
+    if (paxCount > 2 && tableType === "mesa2") {
+      setTableType("mesa4");
+      setSelectedTableNumber(null);
+    }
+  }, [paxCount, tableType]);
+
+  // Visual helper lists of table numbers
+  const mesa4Numbers = Array.from({ length: game.tablesTotal4 }, (_, i) => i + 1); // 1 to 30
+  const mesa2Numbers = Array.from({ length: game.tablesTotal2 }, (_, i) => i + 1); // 1 to 3
+
+  const isTableOccupied = (type: "mesa4" | "mesa2", number: number) => {
+    return activeReservationsForGame.some(r => r.tableType === type && r.tableNumber === number);
+  };
+
+  const isTableBlocked = (type: "mesa4" | "mesa2", number: number) => {
+    return blockedForGame.some(b => b.tableType === type && b.tableNumber === number);
+  };
+
+  const handleCopyPix = () => {
+    navigator.clipboard.writeText("48558675000187");
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const calculatePrice = () => {
+    if (!game.isBrazilGame) return 0;
+    return tableType === "mesa4" ? (game.priceTable4 || 24) : (game.priceTable2 || 12);
+  };
+
+  const handleSubmitDetails = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError("");
+
+    if (!clientName.trim()) {
+      setFormError("Por favor, preencha o nome completo.");
+      return;
+    }
+    if (!clientPhone.trim()) {
+      setFormError("Por favor, informe seu telefone / WhatsApp de contato.");
+      return;
+    }
+    if (!selectedTableNumber) {
+      setFormError("Por favor, selecione uma mesa disponível no mapa.");
+      return;
+    }
+
+    // Double check rules on submission
+    if (paxCount > 2 && tableType === "mesa2") {
+      setFormError("Reservas de 2 lugares comportam no máximo 2 pessoas.");
+      return;
+    }
+
+    if (isTableOccupied(tableType, selectedTableNumber)) {
+      setFormError("Essa mesa já foi reservada por outro cliente. Escolha outro número.");
+      return;
+    }
+
+    if (isTableBlocked(tableType, selectedTableNumber)) {
+      setFormError("Essa mesa encontra-se bloqueada administrativamente.");
+      return;
+    }
+
+    const price = calculatePrice();
+    setLoading(true);
+
+    try {
+      const reservationData = {
+        gameId: game.id,
+        gameName: `${game.homeTeam} vs ${game.awayTeam}`,
+        gameDateTime: game.dateTime,
+        isBrazilGame: game.isBrazilGame,
+        clientName: clientName.trim(),
+        clientPhone: clientPhone.trim(),
+        paxCount: paxCount,
+        tableType: tableType,
+        tableNumber: selectedTableNumber,
+        status: (game.isBrazilGame ? "aguardando comprovante" : "confirmado") as any,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      const path = "reservations";
+      const docRef = await addDoc(collection(db, path), reservationData);
+      
+      const created: Reservation = {
+        id: docRef.id,
+        ...reservationData
+      } as any;
+
+      setCreatedReservation(created);
+
+      if (game.isBrazilGame) {
+        setStep("payment");
+      } else {
+        setStep("success");
+      }
+    } catch (err: any) {
+      handleFirestoreError(err, OperationType.CREATE, "reservations");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Pre-formatted messages
+  const whatsappNumber = "+5531975099398";
+  const whatsappMsg = encodeURIComponent(
+    `Olá! Acabei de fazer minha reserva para o COPAÇO no Quinteiro e estou enviando meu comprovante de pagamento.\n\n*Resumo da Reserva*:\nCliente: ${clientName}\nJogo: ${game.homeTeam} vs ${game.awayTeam}\nMesa Reservada: ${tableType === "mesa4" ? "Mesa para 4 pessoas" : "Mesa para 2 pessoas"} - Número #${selectedTableNumber}\nQuantidade de pessoas: ${paxCount}\n\nAguardando confirmação!`
+  );
+  const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${whatsappMsg}`;
+
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-soccer-dark/90 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-gradient-to-b from-soccer-field/90 to-[#03150b] border border-soccer-gold/30 rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl relative">
+        
+        {/* Header decoration */}
+        <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-green-500 via-soccer-gold to-soccer-orange" />
+
+        {/* Close Button */}
+        <button
+          id="close_modal_btn"
+          onClick={onClose}
+          className="absolute top-4 right-4 text-soccer-cream/50 hover:text-soccer-cream hover:bg-soccer-field/80 p-2 rounded-full transition-all"
+        >
+          <X className="w-5 h-5" />
+        </button>
+
+        {/* Modal Content */}
+        <div className="p-6 md:p-10">
+
+          {/* STEP 1: FILL DETAILS & SELECT TABLES */}
+          {step === "details" && (
+            <div>
+              <div className="mb-6">
+                <span className="text-[10px] font-mono text-soccer-gold uppercase tracking-widest block mb-1">
+                  NOVA RESERVA
+                </span>
+                <h3 className="text-2xl md:text-3xl font-display font-black text-soccer-cream leading-tight">
+                  {game.homeTeam} vs {game.awayTeam}
+                </h3>
+                <p className="text-xs text-soccer-cream/60 mt-1">
+                  Selecione sua mesa e preencha as informações para participar da torcida do Quinteiro.
+                </p>
+              </div>
+
+              {formError && (
+                <div className="bg-soccer-neon/10 border border-soccer-neon/40 text-soccer-cream p-4 rounded-xl text-xs flex items-center gap-2 mb-6">
+                  <AlertTriangle className="w-4 h-4 text-soccer-neon shrink-0 animate-pulse" />
+                  <span>{formError}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleSubmitDetails} className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                
+                {/* Form Fields Left Side */}
+                <div className="lg:col-span-5 space-y-5">
+                  <div className="bg-soccer-dark/50 border border-soccer-field p-5 rounded-2xl space-y-4">
+                    <h4 className="text-sm font-display font-bold text-soccer-gold border-b border-soccer-field/50 pb-2 flex items-center gap-1.5">
+                      <User className="w-4 h-4" />
+                      1. Informações de Contato
+                    </h4>
+
+                    {/* Guest Name */}
+                    <div>
+                      <label className="block text-[10px] font-mono text-soccer-cream/70 uppercase mb-1.5">
+                        Nome Completo
+                      </label>
+                      <div className="relative">
+                        <User className="absolute left-3.5 top-3 w-4 h-4 text-soccer-cream/40" />
+                        <input
+                          id="client_name_input"
+                          type="text"
+                          required
+                          value={clientName}
+                          onChange={(e) => setClientName(e.target.value)}
+                          placeholder="Digite seu nome legal"
+                          className="w-full bg-[#03150b] border border-soccer-field focus:border-soccer-gold text-soccer-cream rounded-xl py-2.5 pl-10 pr-4 text-xs outline-none transition-all"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Guest Phone */}
+                    <div>
+                      <label className="block text-[10px] font-mono text-soccer-cream/70 uppercase mb-1.5">
+                        WhatsApp (Celular)
+                      </label>
+                      <div className="relative">
+                        <Phone className="absolute left-3.5 top-3 w-4 h-4 text-soccer-cream/40" />
+                        <input
+                          id="client_phone_input"
+                          type="tel"
+                          required
+                          value={clientPhone}
+                          onChange={(e) => setClientPhone(e.target.value)}
+                          placeholder="(31) 99999-9999"
+                          className="w-full bg-[#03150b] border border-soccer-field focus:border-soccer-gold text-soccer-cream rounded-xl py-2.5 pl-10 pr-4 text-xs outline-none transition-all"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Pax Count */}
+                    <div>
+                      <label className="block text-[10px] font-mono text-soccer-cream/70 uppercase mb-1.5">
+                        Quantidade de Pessoas
+                      </label>
+                      <div className="relative">
+                        <Users className="absolute left-3.5 top-3 w-4 h-4 text-soccer-cream/40" />
+                        <select
+                          id="pax_select"
+                          value={paxCount}
+                          onChange={(e) => setPaxCount(Number(e.target.value))}
+                          className="w-full bg-[#03150b] border border-soccer-field focus:border-soccer-gold text-soccer-cream rounded-xl py-2.5 pl-10 pr-4 text-xs outline-none transition-all appearance-none cursor-pointer"
+                        >
+                          <option value={1}>1 Pessoa</option>
+                          <option value={2}>2 Pessoas</option>
+                          <option value={3}>3 Pessoas</option>
+                          <option value={4}>4 Pessoas</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Summary Area */}
+                  <div className="bg-soccer-field/20 border border-soccer-gold/20 p-5 rounded-2xl">
+                    <h4 className="text-xs font-mono font-black text-soccer-cream uppercase mb-3 tracking-wider">
+                      Resumo Financeiro
+                    </h4>
+                    <div className="space-y-2 text-xs">
+                      <div className="flex justify-between">
+                        <span className="text-soccer-cream/60">Tipo de jogo:</span>
+                        <span className="font-mono text-soccer-gold font-bold">
+                          {game.isBrazilGame ? "Premium (Brasil)" : "Gratuito"}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-soccer-cream/60">Tipo de Mesa:</span>
+                        <span className="text-soccer-cream">
+                          {tableType === "mesa4" ? "Mesa p/ 4 pessoas" : "Mesa p/ 2 pessoas"}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-soccer-cream/60">Designação:</span>
+                        <span className="text-soccer-cream font-mono">
+                          {selectedTableNumber ? `#${selectedTableNumber}` : "Não selecionada"}
+                        </span>
+                      </div>
+                      <div className="border-t border-soccer-field mt-3 pt-3 flex justify-between items-center">
+                        <span className="text-sm font-display font-medium text-soccer-cream">Valor Total:</span>
+                        <span className="text-xl font-display font-extrabold text-soccer-gold font-mono">
+                          R$ {calculatePrice()},00
+                        </span>
+                      </div>
+                    </div>
+
+                    {!game.isBrazilGame && (
+                      <div className="bg-amber-500/10 border border-amber-500/30 p-3 rounded-xl text-[10px] text-amber-300 mt-4 leading-relaxed">
+                        <Info className="w-3.5 h-3.5 inline mr-1 mb-0.5" />
+                        <strong>Aviso:</strong> Reservas gratuitas expiram automaticamente se não forem ocupadas até 1 hora antes do início do jogo.
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Table Map Grid right side */}
+                <div className="lg:col-span-7 space-y-6">
+                  <div className="bg-soccer-dark/50 border border-soccer-field p-5 rounded-2xl">
+                    
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-soccer-field/50 pb-3 mb-4">
+                      <h4 className="text-sm font-display font-bold text-soccer-gold flex items-center gap-1.5">
+                        <HelpCircle className="w-4 h-4/90" />
+                        2. Escolha sua Mesa no Mapa
+                      </h4>
+
+                      {/* Flex Selector */}
+                      <div className="flex bg-[#03150b] p-0.5 rounded-lg border border-soccer-field text-xs">
+                        <button
+                          id="select_mesa4_type_btn"
+                          type="button"
+                          onClick={() => {
+                            setTableType("mesa4");
+                            setSelectedTableNumber(null);
+                          }}
+                          className={`px-3 py-1 rounded-md transition-all font-semibold select-none ${
+                            tableType === "mesa4"
+                              ? "bg-soccer-gold text-soccer-dark shadow"
+                              : "text-soccer-cream/75 hover:text-soccer-cream"
+                          }`}
+                        >
+                          Mesa de 4
+                        </button>
+                        <button
+                          id="select_mesa2_type_btn"
+                          type="button"
+                          disabled={paxCount > 2}
+                          onClick={() => {
+                            setTableType("mesa2");
+                            setSelectedTableNumber(null);
+                          }}
+                          className={`px-3 py-1 rounded-md transition-all font-semibold select-none disabled:opacity-40 ${
+                            tableType === "mesa2"
+                              ? "bg-soccer-gold text-soccer-dark shadow"
+                              : "text-soccer-cream/75 hover:text-soccer-cream"
+                          }`}
+                        >
+                          Mesa de 2 {paxCount > 2 && "⚠️"}
+                        </button>
+                      </div>
+                    </div>
+
+                    {paxCount > 2 && tableType === "mesa4" && (
+                      <p className="text-[10px] text-soccer-cream/50 mb-3 bg-soccer-field/20 p-2 rounded-lg italic">
+                        💡 Mesas de 4 são recomendadas para seu grupo de {paxCount} pessoas. Mesas de 2 estarão desabilitadas.
+                      </p>
+                    )}
+
+                    {/* Visual Status Legend */}
+                    <div className="flex flex-wrap items-center gap-4 text-[10px] font-mono text-soccer-cream/60 mb-5">
+                      <div className="flex items-center gap-1">
+                        <span className="w-3.5 h-3.5 rounded bg-emerald-800 border border-emerald-500" />
+                        <span>Disponível</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span className="w-3.5 h-3.5 rounded bg-soccer-gold/90 border border-soccer-gold text-soccer-dark flex items-center justify-center text-[8px] font-bold">✓</span>
+                        <span>Selecionada</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span className="w-3.5 h-3.5 rounded bg-soccer-cream/10 border border-soccer-cream/10" />
+                        <span>Reservada</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span className="w-3.5 h-3.5 rounded bg-red-950 border border-red-800" />
+                        <span>Bloqueada</span>
+                      </div>
+                    </div>
+
+                    {/* GRID DISPLAY FOR TABLES OF 4 (30 Tables) */}
+                    {tableType === "mesa4" && (
+                      <div>
+                        <div className="text-[11px] font-mono text-soccer-cream/70 uppercase mb-2">
+                          MESA PARA 4 PESSOAS (30 Mesas Disponíveis)
+                        </div>
+                        <div className="grid grid-cols-5 sm:grid-cols-6 lg:grid-cols-6 gap-3 p-4 bg-[#03150b] rounded-2xl border border-soccer-field max-h-[300px] overflow-y-auto">
+                          {mesa4Numbers.map((num) => {
+                            const occupied = isTableOccupied("mesa4", num);
+                            const blocked = isTableBlocked("mesa4", num);
+                            const selected = selectedTableNumber === num;
+
+                            let btnStyle = "bg-emerald-900/60 text-emerald-300 border-emerald-500 hover:bg-emerald-800 hover:scale-105 cursor-pointer";
+                            if (occupied) {
+                              btnStyle = "bg-soccer-cream/10 text-soccer-cream/30 border-transparent cursor-not-allowed opacity-30";
+                            } else if (blocked) {
+                              btnStyle = "bg-red-950/60 text-red-400 border-red-800 cursor-not-allowed";
+                            } else if (selected) {
+                              btnStyle = "bg-soccer-gold text-soccer-dark border-soccer-gold font-bold scale-105 shadow-lg glow-soccer-gold cursor-pointer";
+                            }
+
+                            return (
+                              <button
+                                key={`mesa4_${num}`}
+                                id={`mesa4_select_btn_${num}`}
+                                type="button"
+                                disabled={occupied || blocked}
+                                onClick={() => setSelectedTableNumber(num)}
+                                className={`h-11 rounded-xl border text-xs flex flex-col items-center justify-center transition-all ${btnStyle}`}
+                              >
+                                <span className="font-mono text-xs">M4</span>
+                                <span className="text-[10px] font-bold ml-0.5">#{num}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* GRID DISPLAY FOR TABLES OF 2 (3 Tables) */}
+                    {tableType === "mesa2" && (
+                      <div>
+                        <div className="text-[11px] font-mono text-soccer-cream/70 uppercase mb-2">
+                          MESA PARA 2 PESSOAS (3 Mesas Disponíveis)
+                        </div>
+                        <div className="grid grid-cols-3 gap-4 p-4 bg-[#03150b] rounded-2xl border border-soccer-field">
+                          {mesa2Numbers.map((num) => {
+                            const occupied = isTableOccupied("mesa2", num);
+                            const blocked = isTableBlocked("mesa2", num);
+                            const selected = selectedTableNumber === num;
+
+                            let btnStyle = "bg-emerald-900/60 text-emerald-300 border-emerald-500 hover:bg-emerald-800 hover:scale-105 cursor-pointer";
+                            if (occupied) {
+                              btnStyle = "bg-soccer-cream/10 text-soccer-cream/30 border-transparent cursor-not-allowed opacity-30";
+                            } else if (blocked) {
+                              btnStyle = "bg-red-950/60 text-red-400 border-red-800 cursor-not-allowed";
+                            } else if (selected) {
+                              btnStyle = "bg-soccer-gold text-soccer-dark border-soccer-gold font-bold scale-105 shadow-lg glow-soccer-gold cursor-pointer";
+                            }
+
+                            return (
+                              <button
+                                key={`mesa2_${num}`}
+                                id={`mesa2_select_btn_${num}`}
+                                type="button"
+                                disabled={occupied || blocked}
+                                onClick={() => setSelectedTableNumber(num)}
+                                className={`h-14 rounded-xl border text-xs flex flex-col items-center justify-center transition-all ${btnStyle}`}
+                              >
+                                <span className="font-mono text-xs">M2</span>
+                                <span className="text-xs font-bold">#{num}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Field Indicator graphic */}
+                    <div className="mt-5 border-t border-dashed border-soccer-field/40 pt-4 text-center">
+                      <div className="inline-block px-10 py-1 border border-soccer-gold/20 rounded-t-xl bg-soccer-field/40 font-display font-medium text-[10px] text-soccer-gold uppercase tracking-wider">
+                        Direção do Telão Principal 📺
+                      </div>
+                      <div className="w-full bg-gradient-to-r from-transparent via-soccer-gold/20 to-transparent h-1" />
+                    </div>
+
+                  </div>
+
+                  {/* Submission Action Button */}
+                  <button
+                    id="submit_reservation_details_btn"
+                    type="submit"
+                    disabled={loading}
+                    className="w-full py-4 rounded-2xl bg-gradient-to-r from-soccer-gold to-yellow-500 hover:from-yellow-500 hover:to-soccer-orange text-soccer-dark font-display font-bold text-sm tracking-wide shadow-lg hover:shadow-soccer-gold/10 transition-all hover:-translate-y-0.5 active:scale-95 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                  >
+                    {loading ? (
+                      <span className="w-5 h-5 rounded-full border-2 border-soccer-dark/20 border-t-soccer-dark animate-spin" />
+                    ) : (
+                      <>
+                        <span>Avançar com Reserva</span>
+                        <ChevronRight className="w-4 h-4 text-soccer-dark" />
+                      </>
+                    )}
+                  </button>
+
+                </div>
+
+              </form>
+            </div>
+          )}
+
+          {/* STEP 2: PIX PAYMENT (BRAZIL GAMES ONLY) */}
+          {step === "payment" && createdReservation && (
+            <div className="max-w-xl mx-auto text-center space-y-6">
+              <div className="w-16 h-16 bg-soccer-gold/10 border border-soccer-gold/30 rounded-full flex items-center justify-center mx-auto">
+                <Clipboard className="w-7 h-7 text-soccer-gold animate-pulse" />
+              </div>
+
+              <div>
+                <span className="text-[10px] font-mono text-soccer-neon uppercase tracking-widest block mb-1">
+                  AGUARDANDO PAGAMENTO PIX
+                </span>
+                <h3 className="text-2xl font-display font-black text-soccer-cream">
+                  Efetue o pagamento de R$ {calculatePrice()},00
+                </h3>
+                <p className="text-xs text-soccer-cream/70 mt-2">
+                  As mesas de jogos do Brasil são concorridas e necessitam de comprovação de depósito via PIX para garantia de vaga.
+                </p>
+              </div>
+
+              {/* PIX Key and Value Card */}
+              <div className="bg-[#03150b] border border-soccer-field p-6 rounded-2xl space-y-4">
+                <div className="text-left bg-soccer-dark/60 p-4 rounded-xl border border-soccer-field/50">
+                  <span className="block text-[10px] font-mono text-soccer-gold uppercase">Chave PIX (CNPJ)</span>
+                  <div className="flex items-center justify-between mt-1">
+                    <span className="font-mono text-sm text-soccer-cream font-semibold">48558675000187</span>
+                    <button
+                      id="copy_pix_key_btn"
+                      onClick={handleCopyPix}
+                      className="px-3 py-1.5 bg-soccer-field hover:bg-soccer-field/80 text-soccer-gold font-mono text-[10px] uppercase rounded-lg transition-colors flex items-center gap-1 font-semibold cursor-pointer"
+                    >
+                      {copied ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>Copiado!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Clipboard className="w-3.5 h-3.5" />
+                          <span>Copiar Chave</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="text-left bg-soccer-dark/60 p-4 rounded-xl border border-soccer-field/50 flex justify-between items-center">
+                  <div>
+                    <span className="block text-[10px] font-mono text-soccer-gold uppercase">Valor do Pix</span>
+                    <span className="font-display text-lg text-soccer-cream font-extrabold font-mono">R$ {calculatePrice()},00</span>
+                  </div>
+                  <div className="text-right text-[10px] font-mono text-soccer-cream/50">
+                    Mesa #{selectedTableNumber}<br />
+                    Para {paxCount} pessoas
+                  </div>
+                </div>
+              </div>
+
+              {/* Instructions and CTA buttons */}
+              <div className="bg-soccer-neon/10 border border-soccer-neon/20 p-5 rounded-2xl text-xs text-left text-soccer-cream leading-relaxed space-y-2">
+                <p className="font-semibold text-soccer-neon text-xs">Instruções Importantes:</p>
+                <ol className="list-decimal list-inside space-y-1.5 text-soccer-cream/80 text-[11px]">
+                  <li>Copie o CNPJ acima e faça a transferência em seu app bancário.</li>
+                  <li>Clique no botão abaixo para abrir o WhatsApp oficial de confirmações do Quinteiro.</li>
+                  <li>Envie o comprovante de transferência diretamente pelo chat.</li>
+                </ol>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-3 pt-4">
+                <button
+                  id="confirm_payment_whatsapp_btn"
+                  onClick={() => {
+                    window.open(whatsappUrl, "_blank", "noopener,noreferrer");
+                    setStep("success");
+                  }}
+                  className="flex-1 bg-gradient-to-r from-emerald-600 to-green-700 hover:from-emerald-500 hover:to-green-600 text-soccer-cream py-3.5 rounded-xl text-xs font-display font-bold flex items-center justify-center gap-2 shadow-lg cursor-pointer"
+                >
+                  <span>Abrir WhatsApp & Enviar Comprovante</span>
+                  <ExternalLink className="w-4 h-4 text-soccer-cream" />
+                </button>
+                <button
+                  id="confirm_already_sent_btn"
+                  onClick={() => setStep("success")}
+                  className="px-6 py-3.5 bg-soccer-field border border-soccer-field/60 hover:bg-soccer-field/90 text-soccer-gold rounded-xl text-xs font-mono font-medium hover:border-soccer-gold/40 transition-colors"
+                >
+                  Já enviei / Concluir
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 3: SUCCESS CONFIRMATION AND THANK YOU */}
+          {step === "success" && (
+            <div className="max-w-xl mx-auto text-center space-y-6 py-6 animate-fade-in">
+              <div className="w-16 h-16 bg-emerald-500/10 border border-emerald-500/30 rounded-full flex items-center justify-center mx-auto">
+                <Check className="w-8 h-8 text-emerald-400" />
+              </div>
+
+              <div>
+                <span className="text-[10px] font-mono text-emerald-400 uppercase tracking-widest block mb-1">
+                  RESERVA CONFIRMADA
+                </span>
+                <h3 className="text-3xl font-display font-black text-soccer-cream">
+                  Sua mesa está reservada!
+                </h3>
+                <p className="text-sm text-soccer-cream/80 mt-2 font-display">
+                  Tudo pronto para o COPAÇO no Quinteiro!
+                </p>
+              </div>
+
+              {createdReservation && (
+                <div className="bg-[#03150b] border border-soccer-field/80 p-5 rounded-2xl text-left space-y-3 font-mono text-xs">
+                  <div className="flex justify-between border-b border-soccer-field/30 pb-2">
+                    <span className="text-soccer-cream/40">Código da Reserva:</span>
+                    <span className="text-soccer-gold font-bold">{createdReservation.id?.substring(0, 8).toUpperCase()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-soccer-cream/40">Jogo:</span>
+                    <span className="text-soccer-cream font-semibold">{createdReservation.gameName}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-soccer-cream/40">Mesa Reservada:</span>
+                    <span className="text-soccer-gold font-bold">
+                      {createdReservation.tableType === "mesa4" ? "Mesa para 4 Pessoas" : "Mesa para 2 Pessoas"} - Número #{createdReservation.tableNumber}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-soccer-cream/40">Convidado Principal:</span>
+                    <span className="text-soccer-cream font-semibold">{createdReservation.clientName}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Text specifics from request criteria */}
+              <div className="bg-soccer-field/30 p-5 rounded-2xl border border-soccer-gold/20 text-xs text-left text-soccer-cream leading-relaxed space-y-3">
+                {game.isBrazilGame ? (
+                  <>
+                    <p className="font-semibold text-soccer-gold text-xs">Informações finais e check-in:</p>
+                    <p className="text-soccer-cream/90 text-xs leading-relaxed">
+                      Sua reserva garante acesso à área do telão principal do COPAÇO, com DJ, promoções especiais de bebidas, sorteios e bolão durante o jogo!
+                    </p>
+                    <p className="text-soccer-cream/90 text-xs leading-relaxed font-semibold text-soccer-orange">
+                      As mesas são ocupadas por ordem de chegada no bar. Nos vemos no jogo!
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="font-semibold text-soccer-gold text-xs">Regras da Reserva Gratuita:</p>
+                    <p className="text-soccer-cream/90 text-[11px] leading-relaxed">
+                      Lembramos que as reservas gratuitas são válidas até 1 hora antes do início da partida. Após esse prazo, a mesa poderá ser liberada automaticamente para novos clientes.
+                    </p>
+                    <p className="text-soccer-cream/90 text-xs font-semibold text-soccer-orange leading-relaxed pt-1">
+                      As mesas são ocupadas por ordem de chegada. Nos vemos no jogo!
+                    </p>
+                  </>
+                )}
+              </div>
+
+              <div className="pt-4">
+                <button
+                  id="final_success_dismiss_btn"
+                  onClick={() => {
+                    onSuccess();
+                    onClose();
+                  }}
+                  className="w-full bg-gradient-to-r from-soccer-gold to-yellow-500 hover:from-yellow-500 hover:to-soccer-orange text-soccer-dark py-4 rounded-xl text-xs font-display font-bold shadow-md cursor-pointer"
+                >
+                  Entendido / Voltar à Home
+                </button>
+              </div>
+            </div>
+          )}
+
+        </div>
+      </div>
+    </div>
+  );
+}
