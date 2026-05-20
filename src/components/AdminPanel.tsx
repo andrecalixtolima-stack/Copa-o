@@ -7,7 +7,7 @@ import React, { useState } from "react";
 import { Game, Reservation, BlockedTable, DashboardMetrics, ReservationStatus, HomepageSettings, getDirectImageUrl, isValidDirectImageUrl } from "../types";
 import LogoImage from "./LogoImage";
 import { db, handleFirestoreError, OperationType, storage } from "../firebase";
-import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
+import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from "firebase/storage";
 import { 
   collection, addDoc, updateDoc, deleteDoc, doc, writeBatch, setDoc
 } from "firebase/firestore";
@@ -66,6 +66,7 @@ export default function AdminPanel({ games, reservations, blockedTables, onRefre
   const [textS4Title, setTextS4Title] = useState("");
   const [textS4Desc, setTextS4Desc] = useState("");
   const [textLogoUrl, setTextLogoUrl] = useState("");
+  const [logoUpdatedAt, setLogoUpdatedAt] = useState<number>(0);
 
   // Storage upload debug states
   const [uploadStatus, setUploadStatus] = useState<"idle" | "uploading" | "success" | "error">("idle");
@@ -92,6 +93,7 @@ export default function AdminPanel({ games, reservations, blockedTables, onRefre
       setTextS4Title(homepageTexts.station4Title || "");
       setTextS4Desc(homepageTexts.station4Desc || "");
       setTextLogoUrl(homepageTexts.logoUrl || "");
+      setLogoUpdatedAt(homepageTexts.logoUpdatedAt || 0);
     }
   }, [homepageTexts]);
 
@@ -117,6 +119,7 @@ export default function AdminPanel({ games, reservations, blockedTables, onRefre
         station4Title: textS4Title.trim(),
         station4Desc: textS4Desc.trim(),
         logoUrl: textLogoUrl,
+        logoUpdatedAt: logoUpdatedAt,
       });
       showFeedback("Textos da página principal e logotipo atualizados com sucesso!");
     } catch (err: any) {
@@ -1102,6 +1105,7 @@ export default function AdminPanel({ games, reservations, blockedTables, onRefre
                 <div className="w-16 h-16 rounded-xl bg-soccer-dark border border-soccer-field/90 flex items-center justify-center overflow-hidden shrink-0 shadow-inner">
                   <LogoImage 
                     logoUrl={textLogoUrl} 
+                    logoUpdatedAt={logoUpdatedAt}
                     alt="Logo Preview" 
                     className="w-full h-full object-contain p-1.5" 
                     fallbackType="admin" 
@@ -1224,13 +1228,18 @@ export default function AdminPanel({ games, reservations, blockedTables, onRefre
                                   async () => {
                                     try {
                                       const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+                                      const now = Date.now();
                                       setUploadStatus("success");
                                       setTextLogoUrl(downloadURL);
+                                      setLogoUpdatedAt(now);
                                       setFirebaseResponse("Logo salva e atualizada com sucesso no Firestore em tempo real!");
                                       
                                       // Real-time Firestore document update
                                       const docRef = doc(db, "settings", "homepage");
-                                      await updateDoc(docRef, { logoUrl: downloadURL });
+                                      await updateDoc(docRef, { 
+                                        logoUrl: downloadURL,
+                                        logoUpdatedAt: now
+                                      });
                                     } catch (err: any) {
                                       setUploadStatus("error");
                                       setUploadError(err.message);
@@ -1250,7 +1259,18 @@ export default function AdminPanel({ games, reservations, blockedTables, onRefre
                         <button
                           type="button"
                           onClick={async () => {
+                            // Delete old logo in Firebase Storage if present
+                            if (textLogoUrl.includes("firebasestorage.googleapis.com")) {
+                              try {
+                                const oldRef = ref(storage, textLogoUrl);
+                                await deleteObject(oldRef);
+                              } catch (e) {
+                                console.warn("Could not delete file from Storage:", e);
+                              }
+                            }
+                            
                             setTextLogoUrl("");
+                            setLogoUpdatedAt(0);
                             setUploadStatus("idle");
                             setUploadError("");
                             setUploadedFileInfo(null);
@@ -1258,7 +1278,10 @@ export default function AdminPanel({ games, reservations, blockedTables, onRefre
                             try {
                               // Real-time Firestore document wipe
                               const docRef = doc(db, "settings", "homepage");
-                              await updateDoc(docRef, { logoUrl: "" });
+                              await updateDoc(docRef, { 
+                                logoUrl: "",
+                                logoUpdatedAt: 0
+                              });
                             } catch (err: any) {
                               console.error("Erro ao apagar logo do Firestore:", err);
                             }
@@ -1277,6 +1300,7 @@ export default function AdminPanel({ games, reservations, blockedTables, onRefre
                         value={textLogoUrl}
                         onChange={async (e) => {
                           const val = e.target.value;
+                          const now = Date.now();
                           setTextLogoUrl(val);
                           if (val && !isValidDirectImageUrl(val)) {
                             setUploadStatus("error");
@@ -1287,8 +1311,12 @@ export default function AdminPanel({ games, reservations, blockedTables, onRefre
                               setUploadError("");
                             }
                             try {
+                              setLogoUpdatedAt(now);
                               const docRef = doc(db, "settings", "homepage");
-                              await updateDoc(docRef, { logoUrl: val });
+                              await updateDoc(docRef, { 
+                                logoUrl: val,
+                                logoUpdatedAt: now
+                              });
                             } catch (err: any) {
                               console.error("Erro ao salvar URL manual:", err);
                             }

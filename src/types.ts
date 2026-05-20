@@ -81,6 +81,7 @@ export interface HomepageSettings {
   station4Title: string;
   station4Desc: string;
   logoUrl?: string;
+  logoUpdatedAt?: number;
 }
 
 export function isValidDirectImageUrl(url: string | undefined): boolean {

@@ -269,6 +269,7 @@ export default function App() {
                 <div id="hero_logo_container" className="relative p-4 sm:p-6 bg-black/40 border border-white/10 rounded-3xl flex items-center justify-center shadow-2xl backdrop-blur-md max-w-[280px] sm:max-w-[340px] mx-auto">
                   <LogoImage 
                     logoUrl={homepageTexts.logoUrl}
+                    logoUpdatedAt={homepageTexts.logoUpdatedAt}
                     alt="Logo Oficial Copaço"
                     className="h-32 sm:h-40 md:h-48 w-auto object-contain transition-transform duration-500 group-hover:scale-105"
                     fallbackType="hero"

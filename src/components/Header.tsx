@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from "react";
-import { auth } from "../firebase";
+import { auth, db } from "../firebase";
 import { 
   signInWithPopup, 
   GoogleAuthProvider, 
@@ -12,6 +12,7 @@ import {
   onAuthStateChanged,
   User
 } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
 import { Shield, LogIn, LogOut, Ticket, Star, X } from "lucide-react";
 import { HomepageSettings, getDirectImageUrl } from "../types";
 import LogoImage from "./LogoImage";
@@ -32,19 +33,61 @@ export default function Header({ isAdminMode, onToggleAdminMode, homepageTexts }
     return localStorage.getItem("copaco_local_admin") === "true";
   });
 
+  const [firebaseAdmin, setFirebaseAdmin] = useState<boolean>(false);
+
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    let active = true;
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!active) return;
       setCurrentUser(user);
-      setAuthLoading(false);
       
-      // If signed in or local session active, verify match and toggle
-      if ((user && user.email === "andrecalixtolima@gmail.com") || localAdmin) {
-        onToggleAdminMode(true);
+      if (user) {
+        try {
+          const idTokenResult = await user.getIdTokenResult();
+          const isAdminClaim = !!idTokenResult.claims.admin;
+          if (active) {
+            if (isAdminClaim) {
+              setFirebaseAdmin(true);
+              onToggleAdminMode(true);
+              setAuthLoading(false);
+              return;
+            }
+
+            // Trust the secure admins collection lookup.
+            // Also permit verified bootstrapped creator email matching under production spec rules.
+            const emailIsBootstrap = user.email === "andrecalixtolima@gmail.com" && user.emailVerified;
+            const adminDocRef = doc(db, "admins", user.uid);
+            const adminDoc = await getDoc(adminDocRef);
+            
+            if (adminDoc.exists() || emailIsBootstrap) {
+              setFirebaseAdmin(true);
+              onToggleAdminMode(true);
+            } else {
+              setFirebaseAdmin(false);
+              onToggleAdminMode(localAdmin);
+            }
+          }
+        } catch (err) {
+          console.error("Erro ao ler credenciais de admin no Firestore:", err);
+          if (active) {
+            setFirebaseAdmin(false);
+            onToggleAdminMode(localAdmin);
+          }
+        }
       } else {
-        onToggleAdminMode(false);
+        if (active) {
+          setFirebaseAdmin(false);
+          onToggleAdminMode(localAdmin);
+        }
+      }
+      if (active) {
+        setAuthLoading(false);
       }
     });
-    return unsubscribe;
+    return () => {
+      active = false;
+      unsubscribe();
+    };
   }, [onToggleAdminMode, localAdmin]);
 
   const handleLogin = async () => {
@@ -85,7 +128,7 @@ export default function Header({ isAdminMode, onToggleAdminMode, homepageTexts }
     }
   };
 
-  const isUserAdmin = (currentUser && currentUser.email === "andrecalixtolima@gmail.com") || localAdmin;
+  const isUserAdmin = firebaseAdmin || localAdmin;
 
   return (
     <header className="sticky top-0 z-50 backdrop-blur-md bg-[#041004]/80 border-b border-white/10 shadow-lg">
@@ -96,6 +139,7 @@ export default function Header({ isAdminMode, onToggleAdminMode, homepageTexts }
           <div className="flex items-center gap-4">
             <LogoImage 
               logoUrl={homepageTexts?.logoUrl} 
+              logoUpdatedAt={homepageTexts?.logoUpdatedAt}
               alt="Logo Copaço" 
               className="w-12 h-12 rounded-xl object-contain bg-white/5 border border-white/10 p-1 shadow-lg shadow-orange-500/10"
               fallbackType="header"

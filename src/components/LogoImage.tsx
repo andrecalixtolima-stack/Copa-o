@@ -1,37 +1,52 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Trophy } from "lucide-react";
 import { motion } from "motion/react";
 import { getDirectImageUrl, isValidDirectImageUrl } from "../types";
 
 interface LogoImageProps {
   logoUrl?: string;
+  logoUpdatedAt?: number;
   alt: string;
   className: string;
   fallbackType: "header" | "hero" | "admin";
 }
 
-export default function LogoImage({ logoUrl, alt, className, fallbackType }: LogoImageProps) {
+const LogoImage = React.memo(function LogoImage({ 
+  logoUrl, 
+  logoUpdatedAt, 
+  alt, 
+  className, 
+  fallbackType 
+}: LogoImageProps) {
   const [hasError, setHasError] = useState(false);
   const [isImageLoading, setIsImageLoading] = useState(true);
 
-  // Reset error and loading state if the URL is modified/updated
+  // Reset error and loading state if the URL or update timestamp changes
   useEffect(() => {
     setHasError(false);
     setIsImageLoading(true);
-  }, [logoUrl]);
+  }, [logoUrl, logoUpdatedAt]);
 
   const isValid = isValidDirectImageUrl(logoUrl);
-  const rawDirectUrl = logoUrl ? getDirectImageUrl(logoUrl) : "";
   
-  // Add direct cache-busting on the client-side for updated images to bypass browser cache
-  const directUrl = rawDirectUrl 
-    ? (rawDirectUrl.includes("?") ? `${rawDirectUrl}&t=${Date.now()}` : `${rawDirectUrl}?t=${Date.now()}`)
-    : "";
+  const directUrl = useMemo(() => {
+    if (!logoUrl || !isValid) return "";
+    const rawDirectUrl = getDirectImageUrl(logoUrl);
+    if (!rawDirectUrl) return "";
+    
+    // Only append version query parameter if logoUpdatedAt is available
+    if (logoUpdatedAt) {
+      return rawDirectUrl.includes("?") 
+        ? `${rawDirectUrl}&t=${logoUpdatedAt}` 
+        : `${rawDirectUrl}?t=${logoUpdatedAt}`;
+    }
+    return rawDirectUrl;
+  }, [logoUrl, logoUpdatedAt, isValid]);
 
   const isDev = !!(import.meta as any).env?.DEV;
 
   if (isDev) {
-    console.log(`[LogoImage] rendering path -> logoUrl: ${logoUrl}, directUrl: ${directUrl}, isValid: ${isValid}`);
+    console.log(`[LogoImage] rendering -> logoUrl: ${logoUrl}, logoUpdatedAt: ${logoUpdatedAt}, directUrl: ${directUrl}`);
   }
 
   // Elegant Premium Fallbacks when there's an error, URL is invalid, or URL is empty
@@ -52,7 +67,7 @@ export default function LogoImage({ logoUrl, alt, className, fallbackType }: Log
     }
     // High-fidelity premium hero fallback when logo is missing or load failed
     return (
-      <div className="pt-2 flex justify-center">
+      <div className="pt-2 flex justify-center animate-fade-in">
         <div className="relative inline-flex flex-col items-center p-6 rounded-2xl bg-white/5 border border-white/10 shadow-xl max-w-[240px]">
           <Trophy className="w-10 h-10 text-soccer-gold animate-bounce mb-2" />
           <span className="font-display font-black text-sm text-soccer-gold uppercase tracking-widest">COPAÇO</span>
@@ -91,4 +106,6 @@ export default function LogoImage({ logoUrl, alt, className, fallbackType }: Log
       />
     </div>
   );
-}
+});
+
+export default LogoImage;
