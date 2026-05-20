@@ -422,7 +422,8 @@ export default function AdminPanel({ games, reservations, blockedTables, onRefre
       });
       showFeedback("Textos da página principal e logotipo atualizados com sucesso!");
     } catch (err: any) {
-      handleFirestoreError(err, OperationType.WRITE, "settings/homepage");
+      console.error("Erro ao salvar textos:", err);
+      showFeedback("", `Erro ao salvar textos: ${err.message || err}`);
     } finally {
       setLoading(false);
     }
@@ -569,7 +570,8 @@ export default function AdminPanel({ games, reservations, blockedTables, onRefre
       setShowGameForm(false);
       onRefresh();
     } catch (err: any) {
-      handleFirestoreError(err, OperationType.WRITE, "games");
+      console.error("Erro ao salvar partida:", err);
+      showFeedback("", `Falha ao salvar partida: ${err.message || err}`);
     } finally {
       setLoading(false);
     }
@@ -587,7 +589,8 @@ export default function AdminPanel({ games, reservations, blockedTables, onRefre
       showFeedback("Jogo excluído com sucesso.");
       onRefresh();
     } catch (err: any) {
-      handleFirestoreError(err, OperationType.DELETE, `games/${gameId}`);
+      console.error("Erro ao deletar partida:", err);
+      showFeedback("", `Falha ao deletar partida: ${err.message || err}`);
     } finally {
       setLoading(false);
     }
@@ -627,7 +630,8 @@ export default function AdminPanel({ games, reservations, blockedTables, onRefre
       showFeedback(`Status da reserva alterado para: ${nextStatus}`);
       onRefresh();
     } catch (err: any) {
-      handleFirestoreError(err, OperationType.WRITE, `reservations/${resId}`);
+      console.error("Erro ao alterar status da reserva:", err);
+      showFeedback("", `Falha ao alterar status da reserva: ${err.message || err}`);
     }
   };
 
@@ -729,7 +733,8 @@ export default function AdminPanel({ games, reservations, blockedTables, onRefre
       setBlockTableNumber("");
       onRefresh();
     } catch (err: any) {
-      handleFirestoreError(err, OperationType.WRITE, "admin_action");
+      console.error("Erro na ação administrativa:", err);
+      showFeedback("", `Falha na ação administrativa: ${err.message || err}`);
     } finally {
       setLoading(false);
     }
@@ -753,7 +758,8 @@ export default function AdminPanel({ games, reservations, blockedTables, onRefre
       setDashSelectedTable(null);
       onRefresh();
     } catch (err: any) {
-      handleFirestoreError(err, OperationType.WRITE, `blockedTables/${activeGameId}_${type}_${number}`);
+      console.error("Erro ao bloquear mesa:", err);
+      showFeedback("", `Falha ao bloquear mesa: ${err.message || err}`);
     } finally {
       setLoading(false);
     }
@@ -768,7 +774,8 @@ export default function AdminPanel({ games, reservations, blockedTables, onRefre
       setDashSelectedTable(null);
       onRefresh();
     } catch (err: any) {
-      handleFirestoreError(err, OperationType.DELETE, `blockedTables/${blockId}`);
+      console.error("Erro ao desbloquear mesa:", err);
+      showFeedback("", `Falha ao desbloquear mesa: ${err.message || err}`);
     } finally {
       setLoading(false);
     }
@@ -831,7 +838,8 @@ export default function AdminPanel({ games, reservations, blockedTables, onRefre
       setDashSelectedTable(null);
       onRefresh();
     } catch (err: any) {
-      handleFirestoreError(err, OperationType.WRITE, "dashboard_manual_book");
+      console.error("Erro no registro manual da mesa:", err);
+      showFeedback("", `Falha no registro manual: ${err.message || err}`);
     } finally {
       setLoading(false);
     }

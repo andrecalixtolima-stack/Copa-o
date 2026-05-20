@@ -714,31 +714,35 @@ const PORT = 3000;
     }
   }, 35000); // Check every 35 seconds
 
-  // Initialize Vite Developer middleware if not in production and not serverless on Vercel
-  if (process.env.NODE_ENV !== "production" && !process.env.VERCEL) {
-    createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    }).then((vite) => {
+  // Asynchronously configure dev server & start listening
+  async function startListening() {
+    if (process.env.NODE_ENV !== "production" && !process.env.VERCEL) {
+      console.log("[COPAÇO SERVER] Initializing Vite Dev Server in dev mode...");
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: "spa",
+      });
       app.use(vite.middlewares);
       app.get("*", (req, res) => {
         res.sendFile(path.join(process.cwd(), "index.html"));
       });
-    }).catch((err) => {
-      console.error("[DEV SERVICE FAULT] Failed to load Vite Dev Server:", err);
-    });
-  } else if (!process.env.VERCEL) {
-    // Serve production static assets compiled by Vite
-    const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
-    app.get("*", (req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
-    });
+    } else if (!process.env.VERCEL) {
+      console.log("[COPAÇO SERVER] Serving compiled static files...");
+      const distPath = path.join(process.cwd(), "dist");
+      app.use(express.static(distPath));
+      app.get("*", (req, res) => {
+        res.sendFile(path.join(distPath, "index.html"));
+      });
+    }
+
+    if (!process.env.VERCEL) {
+      app.listen(PORT, "0.0.0.0", () => {
+        console.log(`[COPAÇO SERVER] Backend running on http://localhost:${PORT}`);
+      });
+    }
   }
 
-  if (!process.env.VERCEL) {
-    app.listen(PORT, "0.0.0.0", () => {
-      console.log(`[COPAÇO SERVER] Backend running on port ${PORT}`);
-    });
-  }
+  startListening().catch((err) => {
+    console.error("[COPAÇO SERVER] Startup failure:", err);
+  });
 

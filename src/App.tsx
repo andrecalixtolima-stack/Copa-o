@@ -100,7 +100,17 @@ export default function App() {
       doc(db, "settings", "homepage"),
       (snap) => {
         if (snap.exists()) {
-          setHomepageTexts(snap.data() as HomepageSettings);
+          const loadedData = snap.data();
+          setHomepageTexts((prev) => {
+            const merged = { ...prev };
+            Object.keys(loadedData).forEach((key) => {
+              const val = loadedData[key];
+              if (val !== undefined && val !== null && val !== "") {
+                (merged as any)[key] = val;
+              }
+            });
+            return merged;
+          });
         }
         setConnectionError(null);
       },

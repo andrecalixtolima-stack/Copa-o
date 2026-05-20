@@ -48,7 +48,8 @@ export default function Header({ isAdminMode, onToggleAdminMode, homepageTexts, 
           const isAdminClaim = !!idTokenResult.claims.admin;
 
           if (active) {
-            if (isAdminClaim) {
+            // Bypass claims and check for the founder's email directly
+            if (isAdminClaim || user.email === "andrecalixtolima@gmail.com") {
               setFirebaseAdmin(true);
               onAdminVerified?.(true);
               onToggleAdminMode(true);
