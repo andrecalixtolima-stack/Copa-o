@@ -23,15 +23,15 @@
     },
     "Reservation": {
       "title": "Reservation",
-      "description": "A table reservation for a specific match",
+      "description": "A table reservation for a specific match containing sensitive customer PII",
       "type": "object",
       "properties": {
         "gameId": { "type": "string", "description": "Associated game document key" },
         "gameName": { "type": "string", "description": "Convenience name of the game (e.g. Brasil vs Serbia)" },
         "gameDateTime": { "type": "string", "format": "date-time", "description": "Date time of the game for expiration processing" },
         "isBrazilGame": { "type": "boolean", "description": "True if this was a paid reservation" },
-        "clientName": { "type": "string", "description": "Customer name" },
-        "clientPhone": { "type": "string", "description": "Customer WhatsApp phone number" },
+        "clientName": { "type": "string", "description": "Customer name (Sensitive PII)" },
+        "clientPhone": { "type": "string", "description": "Customer WhatsApp phone number (Sensitive PII)" },
         "paxCount": { "type": "number", "description": "Number of people attending" },
         "tableType": { "type": "string", "enum": ["mesa4", "mesa2"], "description": "Type of table selected" },
         "tableNumber": { "type": "number", "description": "Allocated unique table number" },
@@ -46,6 +46,20 @@
       },
       "required": ["gameId", "clientName", "clientPhone", "paxCount", "tableType", "tableNumber", "status"]
     },
+    "Availability": {
+      "title": "Availability",
+      "description": "Public derived table allocation containing zero PII",
+      "type": "object",
+      "properties": {
+        "reservationId": { "type": "string", "description": "ID of mirroring reservation" },
+        "gameId": { "type": "string", "description": "ID of the scheduled game" },
+        "tableType": { "type": "string", "enum": ["mesa4", "mesa2"] },
+        "tableNumber": { "type": "number", "description": "Allocated table number" },
+        "status": { "type": "string", "description": "Mirror of reservation status" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["reservationId", "gameId", "tableType", "tableNumber", "status"]
+    },
     "BlockedTable": {
       "title": "BlockedTable",
       "description": "Representing tables manually blocked by the admin",
@@ -58,20 +72,38 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["gameId", "tableType", "tableNumber"]
+    },
+    "Admin": {
+      "title": "Admin",
+      "description": "Authorized administrator details for authentication verification",
+      "type": "object",
+      "properties": {
+        "role": { "type": "string", "description": "The administrative access role" },
+        "addedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["role"]
     }
   },
   "firestore": {
     "/games/{gameId}": {
       "schema": { "$ref": "#/entities/Game" },
-      "description": "World Cup match schedule and setup"
+      "description": "World Cup match schedule and setup (Public: Read, Admin: Write)"
     },
     "/reservations/{reservationId}": {
       "schema": { "$ref": "#/entities/Reservation" },
-      "description": "Client table reservations"
+      "description": "Client table reservations with PII (Public: Create, Admin: Full Access)"
+    },
+    "/availability/{availabilityId}": {
+      "schema": { "$ref": "#/entities/Availability" },
+      "description": "Public derived table status index (Public: Read/Create, Admin: Full Access)"
     },
     "/blockedTables/{blockedTableId}": {
       "schema": { "$ref": "#/entities/BlockedTable" },
-      "description": "Tables blocked manually by administrators"
+      "description": "Tables blocked manually by administrators (Public: Read, Admin: Write)"
+    },
+    "/admins/{adminUid}": {
+      "schema": { "$ref": "#/entities/Admin" },
+      "description": "Authorized system administrators list"
     }
   }
 }

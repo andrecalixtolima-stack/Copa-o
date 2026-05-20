@@ -105,3 +105,21 @@ export function getDirectImageUrl(url: string | undefined): string {
   return "";
 }
 
+export interface AdminUser {
+  uid: string;
+  email: string;
+  role: string;
+  addedAt: string;
+  addedBy: string;
+}
+
+export interface AuditLog {
+  id: string;
+  action: string;
+  details: string;
+  performedBy: string;
+  performedByEmail: string;
+  timestamp: string;
+}
+
+

@@ -12,8 +12,9 @@ import {
   collection, addDoc, updateDoc, deleteDoc, doc, writeBatch, setDoc
 } from "firebase/firestore";
 import { 
-  Calendar, Clock, DollarSign, Users, Trash2, Edit2, Shield, Plus, X, Check, Eye, HelpCircle, AlertOctagon, RefreshCw, Layers, PhoneCall, CheckCircle2, Ban
+  Calendar, Clock, DollarSign, Users, Trash2, Edit2, Shield, Plus, X, Check, Eye, HelpCircle, AlertOctagon, RefreshCw, Layers, PhoneCall, CheckCircle2, Ban, Download, Upload, Database, FileSpreadsheet
 } from "lucide-react";
+import { auth } from "../firebase";
 
 interface AdminPanelProps {
   games: Game[];
@@ -25,7 +26,281 @@ interface AdminPanelProps {
 
 export default function AdminPanel({ games, reservations, blockedTables, onRefresh, homepageTexts }: AdminPanelProps) {
   
-  const [activeTab, setActiveTab] = useState<"dashboard" | "games" | "reservations" | "blocking" | "texts">("dashboard");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "games" | "reservations" | "blocking" | "texts" | "admins" | "backup">("dashboard");
+  const [dashSelectedGameId, setDashSelectedGameId] = useState<string>("");
+  const [dashSelectedTable, setDashSelectedTable] = useState<{type: "mesa4" | "mesa2", number: number} | null>(null);
+  const [dashManualClientName, setDashManualClientName] = useState("");
+  const [dashManualClientPhone, setDashManualClientPhone] = useState("");
+
+  // State for Admin users
+  const [adminUsers, setAdminUsers] = useState<any[]>([]);
+  const [logs, setLogs] = useState<any[]>([]);
+  const [filteredLogs, setFilteredLogs] = useState<any[]>([]);
+  
+  // Promotion inputs
+  const [promoEmail, setPromoEmail] = useState("");
+  const [promoUid, setPromoUid] = useState("");
+  const [logFilterAction, setLogFilterAction] = useState("all");
+  const [logSearch, setLogSearch] = useState("");
+
+  // Backup files
+  const [backupFileContent, setBackupFileContent] = useState<any | null>(null);
+  const [backupFileName, setBackupFileName] = useState("");
+
+  const fetchAdminsAndLogs = async () => {
+    try {
+      const adminsRes = await fetch("/api/admins", {
+        headers: {
+          "x-admin-uid": auth.currentUser?.uid || "",
+          "x-admin-email": auth.currentUser?.email || ""
+        }
+      });
+      if (adminsRes.ok) {
+        const adminsData = await adminsRes.json();
+        setAdminUsers(adminsData);
+      }
+
+      const logsRes = await fetch("/api/audit-logs", {
+        headers: {
+          "x-admin-uid": auth.currentUser?.uid || "",
+          "x-admin-email": auth.currentUser?.email || ""
+        }
+      });
+      if (logsRes.ok) {
+        const logsData = await logsRes.json();
+        setLogs(logsData);
+        setFilteredLogs(logsData);
+      }
+    } catch (err) {
+      console.warn("Could not fetch admins or logs:", err);
+    }
+  };
+
+  React.useEffect(() => {
+    if (activeTab === "admins") {
+      fetchAdminsAndLogs();
+    }
+  }, [activeTab]);
+
+  React.useEffect(() => {
+    let result = logs;
+    
+    if (logFilterAction !== "all") {
+      result = result.filter(log => log.action === logFilterAction);
+    }
+    
+    if (logSearch.trim()) {
+      const s = logSearch.toLowerCase().trim();
+      result = result.filter(log => 
+        log.details.toLowerCase().includes(s) || 
+        log.performedByEmail.toLowerCase().includes(s) ||
+        log.action.toLowerCase().includes(s)
+      );
+    }
+    
+    setFilteredLogs(result);
+  }, [logFilterAction, logSearch, logs]);
+
+  const handlePromoteAdmin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!promoEmail.trim() || !promoUid.trim()) {
+      showFeedback("", "Por favor insira um email e UID válidos.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const response = await fetch("/api/admins/promote", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-uid": auth.currentUser?.uid || "",
+          "x-admin-email": auth.currentUser?.email || ""
+        },
+        body: JSON.stringify({
+          targetEmail: promoEmail.trim(),
+          targetUid: promoUid.trim()
+        })
+      });
+
+      if (!response.ok) {
+        const json = await response.json();
+        throw new Error(json.error || "Erro ao promover usuário.");
+      }
+
+      showFeedback(`Sucesso! ${promoEmail} foi promovido a administrador oficial com claims habilitadas.`);
+      setPromoEmail("");
+      setPromoUid("");
+      fetchAdminsAndLogs();
+    } catch (err: any) {
+      showFeedback("", err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRevokeAdmin = async (uid: string, email: string) => {
+    if (!confirm(`Deseja revogar permanentemente os privilégios de administrador de ${email}?`)) {
+      return;
+    }
+    setLoading(true);
+    try {
+      const response = await fetch("/api/admins/revoke", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-uid": auth.currentUser?.uid || "",
+          "x-admin-email": auth.currentUser?.email || ""
+        },
+        body: JSON.stringify({
+          targetUid: uid,
+          targetEmail: email
+        })
+      });
+
+      if (!response.ok) {
+        const json = await response.json();
+        throw new Error(json.error || "Erro ao revogar administrador.");
+      }
+
+      showFeedback(`Revogado! Acesso administrativo de ${email} cancelado com sucesso.`);
+      fetchAdminsAndLogs();
+    } catch (err: any) {
+      showFeedback("", err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleExportCSV = () => {
+    if (reservations.length === 0) {
+      showFeedback("", "Nenhuma reserva disponível para exportar no momento.");
+      return;
+    }
+
+    try {
+      const csvHeaders = ["ID", "Jogo", "Data do Jogo", "Tipo", "Mesa #", "Cliente", "WhatsApp", "Pax", "Status", "Criado Em"];
+      const csvRows = reservations.map(r => [
+        r.id,
+        `"${r.gameName}"`,
+        r.gameDateTime,
+        r.tableType === "mesa4" ? "Mesa 4" : "Mesa 2",
+        r.tableNumber,
+        `"${r.clientName}"`,
+        `"${r.clientPhone}"`,
+        r.paxCount,
+        r.status,
+        r.createdAt
+      ]);
+
+      const csvContent = "\ufeff" + [
+        csvHeaders.join(","),
+        ...csvRows.map(row => row.join(","))
+      ].join("\n");
+
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", `reservas_copaco_${new Date().toISOString().slice(0, 10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      showFeedback("Sucesso! Planilha CSV de reservas baixada.");
+    } catch (err: any) {
+      showFeedback("", `Falha ao exportar CSV: ${err.message}`);
+    }
+  };
+
+  const handleDownloadBackupJSON = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch("/api/backup/export", {
+        headers: {
+          "x-admin-uid": auth.currentUser?.uid || "",
+          "x-admin-email": auth.currentUser?.email || ""
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error("Não foi possível gerar backup no servidor.");
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", `copaco_firestore_backup_${new Date().toISOString().slice(0, 10)}.json`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      showFeedback("Backup completo do Firestore exportado com sucesso.");
+    } catch (err: any) {
+      showFeedback("", err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleFileSelectForRestore = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setBackupFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const parsed = JSON.parse(event.target?.result as string);
+        if (parsed && typeof parsed === "object" && parsed.version) {
+          setBackupFileContent(parsed);
+          showFeedback("Arquivo de backup validado com sucesso! Pronto para restauração.");
+        } else {
+          showFeedback("", "Arquivo de backup inválido. Chaves de cabeçalho incompletas.");
+        }
+      } catch (err) {
+        showFeedback("", "Erro ao ler payload JSON: arquivo corrompido.");
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const handleRestoreBackup = async () => {
+    if (!backupFileContent) return;
+    if (!confirm("⚠️ ATENÇÃO: Esta ação restaurará e mesclará todos os dados armazenados de jogos, reservas e bloqueios oficiais. Deseja continuar com a recuperação?")) {
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await fetch("/api/backup/import", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-uid": auth.currentUser?.uid || "",
+          "x-admin-email": auth.currentUser?.email || ""
+        },
+        body: JSON.stringify({
+          data: backupFileContent.data
+        })
+      });
+
+      if (!response.ok) {
+        const json = await response.json();
+        throw new Error(json.error || "Erro de restauração no servidor.");
+      }
+
+      const res = await response.json();
+      showFeedback(`Sincronização restaurada! ${res.count} registros re-classificados no Firestore.`);
+      setBackupFileContent(null);
+      setBackupFileName("");
+      onRefresh();
+    } catch (err: any) {
+      showFeedback("", err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Game Form states
   const [editingGame, setEditingGame] = useState<Game | null>(null);
@@ -297,11 +572,34 @@ export default function AdminPanel({ games, reservations, blockedTables, onRefre
   // Manual Status modification
   const handleUpdateStatus = async (resId: string, nextStatus: ReservationStatus) => {
     try {
+      const resSelection = reservations.find(r => r.id === resId);
+      const batch = writeBatch(db);
+      
       const docRef = doc(db, "reservations", resId);
-      await updateDoc(docRef, {
+      batch.update(docRef, {
         status: nextStatus,
         updatedAt: new Date().toISOString()
       });
+
+      if (resSelection) {
+        const availabilityId = `${resSelection.gameId}_${resSelection.tableType}_${resSelection.tableNumber}`;
+        const availRef = doc(db, "availability", availabilityId);
+        
+        if (nextStatus === "cancelado" || nextStatus === "liberada automaticamente") {
+          batch.delete(availRef);
+        } else {
+          batch.set(availRef, {
+            reservationId: resId,
+            gameId: resSelection.gameId,
+            tableType: resSelection.tableType,
+            tableNumber: resSelection.tableNumber,
+            status: nextStatus,
+            updatedAt: new Date().toISOString()
+          }, { merge: true });
+        }
+      }
+
+      await batch.commit();
       showFeedback(`Status da reserva alterado para: ${nextStatus}`);
       onRefresh();
     } catch (err: any) {
@@ -362,7 +660,13 @@ export default function AdminPanel({ games, reservations, blockedTables, onRefre
           return;
         }
 
+        const batch = writeBatch(db);
+        const reservationsRef = collection(db, "reservations");
+        const newReservationRef = doc(reservationsRef);
+        const resId = newReservationRef.id;
+
         const resPayload = {
+          id: resId,
           gameId: selectedGameId,
           gameName: `${game.homeTeam} vs ${game.awayTeam}`,
           gameDateTime: game.dateTime,
@@ -377,7 +681,20 @@ export default function AdminPanel({ games, reservations, blockedTables, onRefre
           updatedAt: new Date().toISOString()
         };
 
-        await addDoc(collection(db, "reservations"), resPayload);
+        const availabilityId = `${selectedGameId}_${blockTableType}_${blockTableNumber}`;
+        const availabilityData = {
+          reservationId: resId,
+          gameId: selectedGameId,
+          tableType: blockTableType,
+          tableNumber: Number(blockTableNumber),
+          status: "confirmado",
+          updatedAt: new Date().toISOString()
+        };
+
+        batch.set(newReservationRef, resPayload);
+        batch.set(doc(db, "availability", availabilityId), availabilityData);
+
+        await batch.commit();
         showFeedback(`Mesa #${blockTableNumber} reservada manualmente para ${manualClientName}.`);
         
         // Reset manual inputs
@@ -389,6 +706,108 @@ export default function AdminPanel({ games, reservations, blockedTables, onRefre
       onRefresh();
     } catch (err: any) {
       handleFirestoreError(err, OperationType.WRITE, "admin_action");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // DASHBOARD ACTION: Block table
+  const handleDashBlock = async (type: "mesa4" | "mesa2", number: number) => {
+    const activeGameId = dashSelectedGameId || games[0]?.id || "";
+    if (!activeGameId) return;
+    setLoading(true);
+    try {
+      const blocksRef = collection(db, "blockedTables");
+      await addDoc(blocksRef, {
+        gameId: activeGameId,
+        tableType: type,
+        tableNumber: number,
+        blockedBy: "Futebol Admin (Dashboard)",
+        createdAt: new Date().toISOString()
+      });
+      showFeedback(`Mesa #${number} bloqueada com sucesso!`);
+      setDashSelectedTable(null);
+      onRefresh();
+    } catch (err: any) {
+      handleFirestoreError(err, OperationType.WRITE, `blockedTables/${activeGameId}_${type}_${number}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // DASHBOARD ACTION: Unblock table
+  const handleDashUnblock = async (blockId: string, number: number) => {
+    setLoading(true);
+    try {
+      await deleteDoc(doc(db, "blockedTables", blockId));
+      showFeedback(`Mesa #${number} desbloqueada com sucesso!`);
+      setDashSelectedTable(null);
+      onRefresh();
+    } catch (err: any) {
+      handleFirestoreError(err, OperationType.DELETE, `blockedTables/${blockId}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // DASHBOARD ACTION: Direct Manual Register
+  const handleDashManualRegister = async (type: "mesa4" | "mesa2", number: number) => {
+    const activeGameId = dashSelectedGameId || games[0]?.id || "";
+    const game = games.find(g => g.id === activeGameId);
+    if (!activeGameId || !game) {
+      showFeedback("", "Selecione uma partida válida.");
+      return;
+    }
+    if (!dashManualClientName.trim() || !dashManualClientPhone.trim()) {
+      showFeedback("", "Preencha o Nome e o WhatsApp do cliente.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const batch = writeBatch(db);
+      const resCollectionRef = collection(db, "reservations");
+      const newResDocRef = doc(resCollectionRef);
+      const resId = newResDocRef.id;
+
+      const resPayload = {
+        id: resId,
+        gameId: activeGameId,
+        gameName: `${game.homeTeam} vs ${game.awayTeam}`,
+        gameDateTime: game.dateTime,
+        isBrazilGame: game.isBrazilGame,
+        clientName: dashManualClientName.trim(),
+        clientPhone: dashManualClientPhone.trim(),
+        paxCount: type === "mesa4" ? 4 : 2,
+        tableType: type,
+        tableNumber: number,
+        status: "confirmado" as const,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      const availabilityId = `${activeGameId}_${type}_${number}`;
+      const availabilityData = {
+        reservationId: resId,
+        gameId: activeGameId,
+        tableType: type,
+        tableNumber: number,
+        status: "confirmado",
+        updatedAt: new Date().toISOString()
+      };
+
+      batch.set(newResDocRef, resPayload);
+      batch.set(doc(db, "availability", availabilityId), availabilityData);
+
+      await batch.commit();
+      showFeedback(`Reserva direta efetuada para a Mesa #${number}!`);
+      
+      setDashManualClientName("");
+      setDashManualClientPhone("");
+      setDashSelectedTable(null);
+      onRefresh();
+    } catch (err: any) {
+      handleFirestoreError(err, OperationType.WRITE, "dashboard_manual_book");
     } finally {
       setLoading(false);
     }
@@ -458,6 +877,26 @@ export default function AdminPanel({ games, reservations, blockedTables, onRefre
           >
             Editar Textos
           </button>
+          <button
+            onClick={() => {
+              setActiveTab("admins");
+            }}
+            className={`px-4 py-2 rounded-lg transition-all ${
+              activeTab === "admins" ? "bg-soccer-gold text-soccer-dark font-bold" : "text-soccer-cream/70 hover:text-soccer-cream"
+            }`}
+          >
+            🔑 Admins & Auditoria
+          </button>
+          <button
+            onClick={() => {
+              setActiveTab("backup");
+            }}
+            className={`px-4 py-2 rounded-lg transition-all ${
+              activeTab === "backup" ? "bg-soccer-gold text-soccer-dark font-bold" : "text-soccer-cream/70 hover:text-soccer-cream"
+            }`}
+          >
+            📦 Backup & Recovery
+          </button>
         </div>
       </div>
 
@@ -477,13 +916,13 @@ export default function AdminPanel({ games, reservations, blockedTables, onRefre
 
       {/* TAB 1: DASHBOARD METRICS */}
       {activeTab === "dashboard" && (
-        <div className="space-y-8 animate-fade-in">
+        <div className="space-y-8 animate-fade-in text-soccer-cream">
           
           {/* Analytical Bento Cards Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             
             {/* Total Reservas */}
-            <div className="bg-soccer-field/30 border border-soccer-field/60 p-6 rounded-2xl flex items-center gap-4 relative overflow-hidden">
+            <div className="bg-soccer-field/30 border border-soccer-field/60 p-6 rounded-2xl flex items-center gap-4 relative overflow-hidden shadow-lg transition-transform hover:scale-[1.01]">
               <div className="p-3 bg-soccer-gold/10 border border-soccer-gold/30 rounded-xl">
                 <Users className="w-6 h-6 text-soccer-gold" />
               </div>
@@ -503,22 +942,22 @@ export default function AdminPanel({ games, reservations, blockedTables, onRefre
             </div>
 
             {/* Faturamento Previsto */}
-            <div className="bg-soccer-field/30 border border-soccer-field/60 p-6 rounded-2xl flex items-center gap-4 relative">
+            <div className="bg-soccer-field/30 border border-soccer-field/60 p-6 rounded-2xl flex items-center gap-4 relative shadow-lg transition-transform hover:scale-[1.01]">
               <div className="p-3 bg-soccer-orange/10 border border-soccer-orange/30 rounded-xl">
-                <DollarSign className="w-6 h-6 text-soccer-orange" />
+                <DollarSign className="w-6 h-6 text-soccer-gold animate-bounce" />
               </div>
               <div>
                 <span className="block text-[10px] font-mono text-soccer-cream/50 uppercase tracking-wider">
                   Faturamento Projetado
                 </span>
-                <span className="font-display text-2xl font-black text-soccer-cream font-mono">
+                <span className="font-display text-2xl font-black text-soccer-gold font-mono">
                   R$ {metrics.faturamentoPrevisto},00
                 </span>
               </div>
             </div>
 
             {/* Faturamento Confirmado */}
-            <div className="bg-soccer-field/30 border border-soccer-field/60 p-6 rounded-2xl flex items-center gap-4 relative">
+            <div className="bg-soccer-field/30 border border-soccer-field/60 p-6 rounded-2xl flex items-center gap-4 relative shadow-lg transition-transform hover:scale-[1.01]">
               <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl">
                 <Check className="w-6 h-6 text-emerald-400" />
               </div>
@@ -533,28 +972,390 @@ export default function AdminPanel({ games, reservations, blockedTables, onRefre
             </div>
 
             {/* Mesas Disponíveis */}
-            <div className="bg-soccer-field/30 border border-soccer-field/60 p-6 rounded-2xl flex items-center gap-4 relative">
+            <div className="bg-soccer-field/30 border border-soccer-field/60 p-6 rounded-2xl flex items-center gap-4 relative shadow-lg transition-transform hover:scale-[1.01]">
               <div className="p-3 bg-soccer-neon/10 border border-soccer-neon/30 rounded-xl">
                 <Layers className="w-6 h-6 text-soccer-neon" />
               </div>
               <div>
                 <span className="block text-[10px] font-mono text-soccer-cream/50 uppercase tracking-wider">
-                  Soma Mesas Restantes
+                  Mesas Ocupadas
                 </span>
                 <span className="font-display text-2xl font-black text-soccer-cream font-mono">
-                  {metrics.mesasReservadas} reservadas
+                  {metrics.mesasReservadas} mesas
                 </span>
               </div>
             </div>
 
           </div>
 
-          {/* Quick instructions and scheduler note */}
-          <div className="bg-soccer-field/20 border border-soccer-gold/20 p-5 rounded-2xl text-xs space-y-2">
-            <span className="font-display font-bold text-soccer-gold block text-sm">Automações Agendadas & Verificadores:</span>
-            <p className="text-soccer-cream/80 text-xs leading-relaxed">
-              Nosso servidor roda um monitorador a cada 10 segundos para conferir a agenda de jogos. Caso uma reserva seja <span className="text-soccer-orange font-bold uppercase font-mono">Gratuita</span> e a partida esteja a <strong>menos de 1 hora</strong> para iniciar, todos os slots expiram automaticamente, alterando o status para <span className="text-soccer-neon font-bold uppercase font-mono">liberada automaticamente</span> para evitar assentos vazios no Quinteiro.
-            </p>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            
+            {/* LEFT AREA: OCCUPATION PER GAME LIST & METRICS */}
+            <div className="lg:col-span-4 space-y-6">
+              
+              <div className="bg-soccer-dark border border-soccer-field/80 p-5 rounded-2xl space-y-4 shadow-xl">
+                <h3 className="font-display font-black text-sm tracking-tight text-soccer-gold uppercase flex items-center gap-2">
+                  <Database className="w-4 h-4 text-soccer-gold" />
+                  Ocupação por Partida
+                </h3>
+
+                <div className="space-y-4 max-h-[300px] overflow-y-auto pr-1">
+                  {games.map(g => {
+                    const activeRes = reservations.filter(
+                      r => r.gameId === g.id && r.status !== "cancelado" && r.status !== "liberada automaticamente"
+                    );
+                    const blockedCount = blockedTables.filter(b => b.gameId === g.id).length;
+                    const totalTables = g.tablesTotal4 + g.tablesTotal2;
+                    const occupiedAndBlocked = activeRes.length + blockedCount;
+                    const percent = totalTables > 0 ? Math.round((occupiedAndBlocked / totalTables) * 100) : 0;
+                    
+                    const isSelected = (dashSelectedGameId || (games[0]?.id || "")) === g.id;
+
+                    return (
+                      <button
+                        key={g.id}
+                        type="button"
+                        onClick={() => {
+                          setDashSelectedGameId(g.id);
+                          setDashSelectedTable(null);
+                        }}
+                        className={`w-full text-left p-3.5 rounded-xl border transition-all cursor-pointer ${
+                          isSelected
+                            ? "bg-soccer-field border-soccer-gold/60 glow-soccer-gold"
+                            : "bg-[#03150b] border-soccer-field/40 hover:border-soccer-gold/30 hover:bg-soccer-field/15"
+                        }`}
+                      >
+                        <div className="flex justify-between items-start">
+                          <span className="text-xs font-display font-bold text-white uppercase block truncate max-w-[170px]">
+                            {g.homeTeam} vs {g.awayTeam}
+                          </span>
+                          <span className={`text-[9px] font-mono font-black px-1.5 py-0.5 rounded ${
+                            percent >= 80 ? "bg-red-950 text-red-400" : percent >= 40 ? "bg-yellow-950 text-soccer-gold" : "bg-emerald-950 text-emerald-400"
+                          }`}>
+                            {percent}%
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-white/50 font-mono mt-1">
+                          Mesas: {occupiedAndBlocked} / {totalTables} • Bloqueadas: {blockedCount}
+                        </div>
+                        
+                        {/* Custom visual progress bar */}
+                        <div className="w-full bg-[#051c0f] h-1.5 rounded-full mt-2 overflow-hidden border border-white/5">
+                          <div 
+                            className={`h-full rounded-full transition-all duration-500 ${
+                              percent >= 80 ? "bg-red-500" : percent >= 40 ? "bg-soccer-gold" : "bg-emerald-400"
+                            }`}
+                            style={{ width: `${percent}%` }}
+                          />
+                        </div>
+                      </button>
+                    );
+                  })}
+
+                  {games.length === 0 && (
+                    <p className="text-xs text-white/40 italic text-center py-6">Nenhuma partida registrada no Quinteiro.</p>
+                  )}
+                </div>
+              </div>
+
+              {/* AUTOMATION EXPLAINER CARD */}
+              <div className="bg-soccer-field/20 border border-soccer-gold/20 p-5 rounded-2xl text-xs space-y-2">
+                <span className="font-display font-bold text-soccer-gold block text-xs tracking-wider uppercase">Monitoramento & Resiliência:</span>
+                <p className="text-soccer-cream/80 text-[11px] leading-relaxed font-sans">
+                  A nossa camada de observabilidade do Express e Firestore monitora o status das reservas continuamente. Reservas do tipo <strong className="text-soccer-gold">Gratuito</strong> sem presença validada em jogos iminentes são expiradas de forma a otimizar a receita real do Quinteiro.
+                </p>
+                <div className="pt-2 flex items-center gap-2 border-t border-soccer-gold/15">
+                  <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="font-mono text-[9px] text-[#f5f5f0]/60 uppercase">Conexão do Banco Ativa</span>
+                </div>
+              </div>
+
+            </div>
+
+            {/* RIGHT AREA: THE INTERACTIVE GRAPHICAL TABLE MAP OF THE BAR */}
+            <div className="lg:col-span-8 space-y-4">
+              
+              {/* Dynamic Game Variable configuration */}
+              {(() => {
+                const activeGameId = dashSelectedGameId || games[0]?.id || "";
+                const activeGame = games.find(g => g.id === activeGameId);
+                
+                if (!activeGame) {
+                  return (
+                    <div className="bg-soccer-dark border border-soccer-field/80 p-8 rounded-2xl text-center text-soccer-cream/50 italic">
+                      Por favor, crie ou selecione uma partida para gerar o mapa de mesas interativo.
+                    </div>
+                  );
+                }
+
+                // Calculations
+                const activeRes = reservations.filter(
+                  r => r.gameId === activeGameId && r.status !== "cancelado" && r.status !== "liberada automaticamente"
+                );
+                const activeBlocks = blockedTables.filter(b => b.gameId === activeGameId);
+
+                const getTableStatus = (type: "mesa4" | "mesa2", number: number) => {
+                  const matchingRes = activeRes.find(r => r.tableType === type && r.tableNumber === number);
+                  const matchingBlock = activeBlocks.find(b => b.tableType === type && b.tableNumber === number);
+                  
+                  if (matchingBlock) return { status: "blocked" as const, block: matchingBlock };
+                  if (matchingRes) return { status: "reserved" as const, res: matchingRes };
+                  return { status: "free" as const };
+                };
+
+                return (
+                  <div className="bg-soccer-dark border border-soccer-field/80 p-5 md:p-6 rounded-3xl space-y-6 shadow-xl relative overflow-hidden">
+                    
+                    {/* Background Field Lines Overlay for Football Stadium Feel */}
+                    <div className="absolute inset-x-o top-[-20%] bottom-[-20%] pointer-events-none opacity-[0.04] bg-[radial-gradient(#ebd152_2px,transparent_2px)] [background-size:16px_16px]" />
+                    <div className="absolute inset-y-0 left-1/2 w-0.5 border-dashed border-2 border-soccer-gold/25 pointer-events-none" />
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 rounded-full border-2 border-soccer-gold/25 pointer-events-none" />
+
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-soccer-field/60 pb-4 relative z-10">
+                      <div>
+                        <span className="text-[9px] font-mono text-soccer-gold font-bold uppercase tracking-widest block">MAPA DE OCUPAÇÃO EM TEMPO REAL</span>
+                        <h4 className="font-display font-black text-lg text-white uppercase mt-0.5">
+                          {activeGame.homeTeam} vs {activeGame.awayTeam}
+                        </h4>
+                      </div>
+                      <div className="flex gap-2">
+                        <span className="flex items-center gap-1 text-[10px] font-mono bg-emerald-950 border border-emerald-800 text-emerald-400 px-2 py-0.5 rounded">
+                          <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                          Livre
+                        </span>
+                        <span className="flex items-center gap-1 text-[10px] font-mono bg-red-950 border border-red-900 text-red-400 px-2 py-0.5 rounded">
+                          <span className="w-2 h-2 rounded-full bg-red-500" />
+                          Reservado
+                        </span>
+                        <span className="flex items-center gap-1 text-[10px] font-mono bg-yellow-950 border border-soccer-gold/30 text-soccer-gold px-2 py-0.5 rounded">
+                          <span className="w-2 h-2 rounded-full bg-soccer-gold" />
+                          Bloqueado
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* TWO GROUPS: MESA 4 E MESA 2 */}
+                    <div className="space-y-6 relative z-10">
+                      
+                      {/* MESAS DE 4 SEATS */}
+                      <div className="space-y-3">
+                        <div className="text-xs font-display font-bold text-white/80 uppercase tracking-wider flex items-center gap-1.5">
+                          <Users className="w-4 h-4 text-soccer-gold" />
+                          Mesas de 4 Lugares ({activeGame.tablesTotal4} Mesas Oficiais)
+                        </div>
+
+                        <div className="grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2.5">
+                          {Array.from({ length: activeGame.tablesTotal4 }, (_, idx) => {
+                            const tableNum = idx + 1;
+                            const tState = getTableStatus("mesa4", tableNum);
+                            const isInspected = dashSelectedTable?.type === "mesa4" && dashSelectedTable?.number === tableNum;
+
+                            return (
+                              <button
+                                key={`m4_${tableNum}`}
+                                type="button"
+                                onClick={() => {
+                                  setDashSelectedTable({ type: "mesa4", number: tableNum });
+                                  setDashManualClientName("");
+                                  setDashManualClientPhone("");
+                                }}
+                                className={`h-11 rounded-lg font-mono text-xs text-center font-bold relative flex items-center justify-center transition-all cursor-pointer border ${
+                                  isInspected
+                                    ? "bg-soccer-gold text-soccer-dark border-white scale-105 shadow-md z-20 font-black animate-pulse"
+                                    : tState.status === "blocked"
+                                    ? "bg-yellow-950/40 text-soccer-gold border-soccer-gold/40 hover:bg-yellow-950/60"
+                                    : tState.status === "reserved"
+                                    ? "bg-red-950/30 text-red-300 border-red-500/40 hover:bg-red-950/50"
+                                    : "bg-[#03150b] text-emerald-400 border-soccer-field/50 hover:bg-soccer-field/30 hover:border-emerald-400"
+                                }`}
+                                title={`Mesa M4 #${tableNum}`}
+                              >
+                                {tableNum}
+                                {tState.status === "blocked" && <span className="absolute bottom-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-soccer-gold" />}
+                                {tState.status === "reserved" && <span className="absolute bottom-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-red-500" />}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* MESAS DE 2 SEATS */}
+                      <div className="space-y-3 pt-2">
+                        <div className="text-xs font-display font-bold text-white/80 uppercase tracking-wider flex items-center gap-1.5">
+                          <Users className="w-3.5 h-3.5 text-soccer-orange" />
+                          Mesas Bistrô de 2 Lugares ({activeGame.tablesTotal2} Mesas Extra)
+                        </div>
+
+                        <div className="grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2.5">
+                          {Array.from({ length: activeGame.tablesTotal2 }, (_, idx) => {
+                            const tableNum = idx + 1;
+                            const tState = getTableStatus("mesa2", tableNum);
+                            const isInspected = dashSelectedTable?.type === "mesa2" && dashSelectedTable?.number === tableNum;
+
+                            return (
+                              <button
+                                key={`m2_${tableNum}`}
+                                type="button"
+                                onClick={() => {
+                                  setDashSelectedTable({ type: "mesa2", number: tableNum });
+                                  setDashManualClientName("");
+                                  setDashManualClientPhone("");
+                                }}
+                                className={`h-11 rounded-lg font-mono text-xs text-center font-bold relative flex items-center justify-center transition-all cursor-pointer border ${
+                                  isInspected
+                                    ? "bg-soccer-gold text-soccer-dark border-white scale-105 shadow-md z-20 font-black animate-pulse"
+                                    : tState.status === "blocked"
+                                    ? "bg-yellow-950/40 text-soccer-gold border-soccer-gold/40 hover:bg-yellow-950/60"
+                                    : tState.status === "reserved"
+                                    ? "bg-red-950/30 text-red-300 border-red-500/40 hover:bg-red-950/50"
+                                    : "bg-[#03150b] text-[#ebd152] border-soccer-field/50 hover:bg-soccer-field/30 hover:border-[#ebd152]"
+                                }`}
+                                title={`Mesa M2 #${tableNum}`}
+                              >
+                                M2-{tableNum}
+                                {tState.status === "blocked" && <span className="absolute bottom-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-soccer-gold" />}
+                                {tState.status === "reserved" && <span className="absolute bottom-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-red-500" />}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                    </div>
+
+                    {/* DYNAMIC QUICK BOTTOM SHEET / INSPECT CARD FOR CLI-SELECTION */}
+                    {dashSelectedTable && (() => {
+                      const tState = getTableStatus(dashSelectedTable.type, dashSelectedTable.number);
+                      
+                      return (
+                        <div className="bg-[#03150b] border-2 border-soccer-gold/60 p-5 rounded-2xl space-y-4 animate-fade-in relative z-20 mt-4 shadow-2xl">
+                          <div className="flex justify-between items-center pb-2 border-b border-soccer-field/50">
+                            <h5 className="font-display font-bold text-xs uppercase text-soccer-gold tracking-widest">
+                              Inspeção Rápida: {dashSelectedTable.type === "mesa4" ? "Mesa 4 Lugares" : "Bistrô 2 Lugares"} #{dashSelectedTable.number}
+                            </h5>
+                            <button
+                              type="button"
+                              onClick={() => setDashSelectedTable(null)}
+                              className="text-white/40 hover:text-white hover:bg-white/5 p-1 rounded-full cursor-pointer"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+
+                          {tState.status === "free" && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+                              {/* Option A: Quick block table */}
+                              <div className="space-y-2">
+                                <p className="text-[11px] text-white/70">A mesa está <strong className="text-emerald-400">livre</strong>. Escolha uma ação rápida abaixo:</p>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDashBlock(dashSelectedTable.type, dashSelectedTable.number)}
+                                  className="w-full py-2 bg-yellow-950 hover:bg-soccer-gold hover:text-black border border-soccer-gold/40 text-soccer-gold rounded-lg font-mono text-[11px] uppercase tracking-wide font-bold transition-all cursor-pointer"
+                                >
+                                  Bloquear Mesa Temporariamente
+                                </button>
+                              </div>
+
+                              {/* Option B: Quick manual reservation */}
+                              <div className="bg-[#051c0f]/80 p-3.5 border border-soccer-field rounded-xl space-y-2 text-left">
+                                <span className="text-[10px] font-mono text-soccer-gold font-bold block uppercase">Reserva Manual Direta</span>
+                                <div className="space-y-2">
+                                  <input
+                                    type="text"
+                                    placeholder="Nome do cliente"
+                                    value={dashManualClientName}
+                                    onChange={(e) => setDashManualClientName(e.target.value)}
+                                    className="w-full bg-[#03150b] border border-soccer-field text-xs px-2.5 py-1.5 rounded-lg focus:border-soccer-gold outline-none"
+                                  />
+                                  <input
+                                    type="text"
+                                    placeholder="Telefone / WhatsApp"
+                                    value={dashManualClientPhone}
+                                    onChange={(e) => setDashManualClientPhone(e.target.value)}
+                                    className="w-full bg-[#03150b] border border-soccer-field text-xs px-2.5 py-1.5 rounded-lg focus:border-soccer-gold outline-none"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDashManualRegister(dashSelectedTable.type, dashSelectedTable.number)}
+                                    className="w-full py-1.5 bg-soccer-gold text-soccer-dark font-display font-black text-[10px] uppercase rounded-lg hover:bg-yellow-500 cursor-pointer"
+                                  >
+                                    Registrar Reserva Manual
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {tState.status === "blocked" && (
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[#0c130b] p-3 rounded-xl border border-yellow-950">
+                              <div className="text-[11px]">
+                                <span className="text-soccer-gold font-bold uppercase font-mono block">Status: MESA BLOQUEADA</span>
+                                <p className="text-white/60 text-xs font-sans">Mesa reservada para uso logístico / VIP.</p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleDashUnblock(tState.block!.id, dashSelectedTable.number)}
+                                className="px-4 py-2 bg-emerald-950/80 border border-emerald-700 text-emerald-400 hover:bg-emerald-800 hover:text-white rounded-lg text-xs font-bold transition-all cursor-pointer"
+                              >
+                                Desbloquear Mesa
+                              </button>
+                            </div>
+                          )}
+
+                          {tState.status === "reserved" && (
+                            <div className="bg-red-950/20 border border-red-900/50 p-4 rounded-xl space-y-3 text-left">
+                              <span className="text-[10px] font-mono text-red-400 uppercase tracking-widest font-black block">TUTOR DA RESERVA ATIVA</span>
+                              
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                                <div>
+                                  <span className="text-[#f5f5f0]/40 font-mono text-[9px] block uppercase">Titular</span>
+                                  <span className="font-bold text-white block truncate">{tState.res!.clientName}</span>
+                                </div>
+                                <div>
+                                  <span className="text-[#f5f5f0]/40 font-mono text-[9px] block uppercase">Telefone</span>
+                                  <span className="font-mono text-soccer-gold block">{tState.res!.clientPhone}</span>
+                                </div>
+                                <div>
+                                  <span className="text-[#f5f5f0]/40 font-mono text-[9px] block uppercase">Status Financeiro</span>
+                                  <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold font-mono mt-0.5 ${
+                                    tState.res!.status === "confirmado" ? "bg-emerald-950 text-emerald-400" : "bg-yellow-950 text-soccer-gold"
+                                  }`}>
+                                    {tState.res!.status}
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="pt-2 border-t border-red-900/40 flex justify-end gap-2 text-xs">
+                                {tState.res!.status === "aguardando comprovante" && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleUpdateStatus(tState.res!.id, "confirmado")}
+                                    className="px-3 py-1.5 bg-emerald-950 border border-emerald-800 hover:bg-emerald-900 text-emerald-300 font-mono text-[10px] rounded uppercase font-bold cursor-pointer"
+                                  >
+                                    Confirmar Pix Manualmente
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateStatus(tState.res!.id, "cancelado")}
+                                  className="px-3 py-1.5 bg-red-950/80 border border-red-800 hover:bg-red-800 hover:text-white text-red-400 font-mono text-[10px] rounded uppercase font-bold cursor-pointer"
+                                >
+                                  Cancelar Reserva
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
+                        </div>
+                      );
+                    })()}
+
+                  </div>
+                );
+              })()}
+
+            </div>
+
           </div>
 
         </div>
@@ -1614,6 +2415,256 @@ export default function AdminPanel({ games, reservations, blockedTables, onRefre
             </button>
           </div>
         </form>
+      )}
+
+      {/* TAB 6: ADMINS & AUDIT LOGS */}
+      {activeTab === "admins" && (
+        <div className="space-y-8 animate-fade-in">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            {/* PROMOTE ADMIN FORM */}
+            <div className="lg:col-span-1 bg-soccer-dark/60 p-6 rounded-2xl border border-soccer-field/50 space-y-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Shield className="w-5 h-5 text-soccer-gold" />
+                <h3 className="font-display font-bold text-sm text-soccer-gold uppercase">Promover Administrador</h3>
+              </div>
+              <p className="text-[11px] text-soccer-cream/70 font-sans leading-relaxed">
+                Insira o UID e Email oficiais do Firebase Auth do usuário para conceder privilégios oficiais de Custom Claims.
+              </p>
+              
+              <form onSubmit={handlePromoteAdmin} className="space-y-4 pt-2">
+                <div>
+                  <label className="block text-[10px] font-mono text-soccer-cream/50 uppercase mb-1">Email do Usuário</label>
+                  <input
+                    type="email"
+                    required
+                    placeholder="ex: admin@copaco.com"
+                    value={promoEmail}
+                    onChange={(e) => setPromoEmail(e.target.value)}
+                    className="w-full bg-[#051c0f] border border-soccer-field text-xs text-soccer-cream rounded-lg p-2.5 outline-none focus:border-soccer-gold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-mono text-soccer-cream/50 uppercase mb-1">Firebase UID</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Cole o UID do Console Firebase"
+                    value={promoUid}
+                    onChange={(e) => setPromoUid(e.target.value)}
+                    className="w-full bg-[#051c0f] border border-soccer-field text-xs text-soccer-cream rounded-lg p-2.5 outline-none focus:border-soccer-gold"
+                  />
+                </div>
+                
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full py-2.5 bg-soccer-gold text-soccer-dark font-display font-extrabold text-xs rounded-xl hover:bg-yellow-500 transition-all cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <Plus className="w-4 h-4 text-soccer-dark" />
+                  {loading ? "Promovendo..." : "Conceder Acesso"}
+                </button>
+              </form>
+            </div>
+
+            {/* REGISTERED ADMINS LIST */}
+            <div className="lg:col-span-2 bg-soccer-dark/60 p-6 rounded-2xl border border-soccer-field/50 space-y-4">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <Users className="w-5 h-5 text-soccer-gold" />
+                  <h3 className="font-display font-bold text-sm text-soccer-gold uppercase">Administradores Ativos</h3>
+                </div>
+                <button 
+                  onClick={fetchAdminsAndLogs}
+                  className="p-1 px-2.5 bg-soccer-field/40 text-soccer-cream text-[10px] font-mono rounded hover:bg-soccer-field/70 transition flex items-center gap-1 cursor-pointer"
+                >
+                  <RefreshCw className="w-3 h-3 text-soccer-gold" /> Recarregar
+                </button>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-soccer-field/30 text-soccer-cream/50 font-mono text-[10px] uppercase">
+                      <th className="py-2.5">Email</th>
+                      <th className="py-2.5">UID</th>
+                      <th className="py-2.5">Adicionado por</th>
+                      <th className="py-2.5 text-right font-sans">Ação</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-soccer-field/10">
+                    {adminUsers.map((user) => (
+                      <tr key={user.uid} className="hover:bg-soccer-field/10">
+                        <td className="py-3 font-semibold text-soccer-cream">{user.email}</td>
+                        <td className="py-3 font-mono text-[10px] text-soccer-cream/60">{user.uid}</td>
+                        <td className="py-3 text-[11px] text-soccer-cream/70">{user.addedBy || "Superadmin"}</td>
+                        <td className="py-3 text-right">
+                          {user.email === "andrecalixtolima@gmail.com" ? (
+                            <span className="text-[9px] font-mono text-soccer-gold bg-soccer-gold/10 px-1.5 py-0.5 rounded font-bold">Founder</span>
+                          ) : (
+                            <button
+                              onClick={() => handleRevokeAdmin(user.uid, user.email)}
+                              className="text-[10px] text-soccer-neon hover:underline font-mono cursor-pointer"
+                            >
+                              Revogar
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                    {adminUsers.length === 0 && (
+                      <tr>
+                        <td colSpan={4} className="py-4 text-center text-soccer-cream/40 font-mono">Carregando administradores oficiais...</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+          </div>
+
+          {/* AUDIT LOG TIMELINE */}
+          <div className="bg-soccer-dark/60 p-6 rounded-2xl border border-soccer-field/50 space-y-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-soccer-field/30 pb-4">
+              <div className="flex items-center gap-2">
+                <Layers className="w-5 h-5 text-soccer-gold" />
+                <h3 className="font-display font-bold text-sm text-soccer-gold uppercase">Trilha de Auditoria Administrativa</h3>
+              </div>
+              
+              <div className="flex flex-wrap items-center gap-3">
+                <input
+                  type="text"
+                  placeholder="Pesquisar logs..."
+                  value={logSearch}
+                  onChange={(e) => setLogSearch(e.target.value)}
+                  className="bg-[#051c0f] border border-soccer-field text-xs text-soccer-cream rounded-lg p-2 px-3 outline-none focus:border-soccer-gold w-48 font-sans"
+                />
+                
+                <select
+                  value={logFilterAction}
+                  onChange={(e) => setLogFilterAction(e.target.value)}
+                  className="bg-[#051c0f] border border-soccer-field text-xs text-soccer-cream rounded-lg p-2 px-3 outline-none focus:border-soccer-gold"
+                >
+                  <option value="all">Todas as Ações</option>
+                  <option value="create_reservation">Criação de reserva</option>
+                  <option value="update_status">Alteração de status</option>
+                  <option value="block_table">Bloqueio de mesa</option>
+                  <option value="unblock_table">Desbloqueio de mesa</option>
+                  <option value="promote_admin">Promoção de admin</option>
+                  <option value="revoke_admin">Revogação de admin</option>
+                  <option value="auto_release">Expirador automático</option>
+                  <option value="restore_backup">Restauração de backup</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="max-h-96 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
+              {filteredLogs.map((log) => (
+                <div key={log.id} className="p-3 bg-[#051c0f]/80 rounded-xl border border-soccer-field/20 hover:border-soccer-field/40 transition flex items-start justify-between gap-4">
+                  <div className="space-y-1">
+                    <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${
+                      log.action.includes("promote") ? "bg-[#10b981]/10 text-[#10b981] border border-[#10b981]/20" :
+                      log.action.includes("revoke") ? "bg-red-500/10 text-red-400 border border-red-500/20" :
+                      log.action.includes("block") ? "bg-amber-500/10 text-amber-400 border border-amber-500/20" :
+                      log.action.includes("auto_release") ? "bg-soccer-neon/10 text-soccer-cream border border-soccer-neon/20" :
+                      "bg-soccer-field/20 text-soccer-cream"
+                    }`}>
+                      {log.action}
+                    </span>
+                    <p className="text-xs text-soccer-cream font-medium leading-normal">{log.details}</p>
+                    <div className="flex flex-wrap items-center gap-x-2 text-[10px] text-soccer-cream/50 font-mono">
+                      <span>Executante: {log.performedByEmail || log.performedBy}</span>
+                      <span>•</span>
+                      <span>UID: {log.performedBy}</span>
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-mono text-soccer-cream/40 whitespace-nowrap pt-1">
+                    {new Date(log.timestamp).toLocaleString("pt-BR")}
+                  </span>
+                </div>
+              ))}
+              {filteredLogs.length === 0 && (
+                <p className="text-center font-mono text-xs text-soccer-cream/30 py-8">Nenhum evento registrado com estas características.</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 7: BACKUP & RECOVERY */}
+      {activeTab === "backup" && (
+        <div className="space-y-8 animate-fade-in">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            
+            {/* EXPORTS CARD */}
+            <div className="bg-soccer-dark/60 p-6 rounded-2xl border border-soccer-field/50 space-y-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Database className="w-5 h-5 text-soccer-gold" />
+                <h3 className="font-display font-bold text-sm text-soccer-gold uppercase">Exportação Descentralizada</h3>
+              </div>
+              <p className="text-xs text-soccer-cream/70 font-sans leading-relaxed">
+                Exporte relatórios das reservas para controle físico ou salve cópias completas do banco Firestore para contingências.
+              </p>
+
+              <div className="grid grid-cols-1 gap-3 pt-2">
+                <button
+                  onClick={handleExportCSV}
+                  className="w-full py-4 bg-soccer-field hover:bg-soccer-field/80 text-soccer-cream font-display font-bold rounded-xl text-xs transition-all flex items-center justify-center gap-2 border border-soccer-field/90 hover:scale-[1.02] cursor-pointer"
+                >
+                  <FileSpreadsheet className="w-5 h-5 text-soccer-gold" />
+                  Planilha de Reservas (CSV)
+                </button>
+
+                <button
+                  onClick={handleDownloadBackupJSON}
+                  className="w-full py-4 bg-soccer-dark border border-soccer-field/80 text-soccer-cream hover:bg-soccer-field/15 font-display font-medium rounded-xl text-xs transition-all flex items-center justify-center gap-2 hover:scale-[1.02] cursor-pointer"
+                >
+                  <Download className="w-5 h-5 text-soccer-gold" />
+                  Download Backup do Sistema (JSON)
+                </button>
+              </div>
+            </div>
+
+            {/* RESTORE CARD */}
+            <div className="bg-soccer-dark/60 p-6 rounded-2xl border border-soccer-field/50 space-y-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Upload className="w-5 h-5 text-soccer-neon" />
+                <h3 className="font-display font-bold text-sm text-soccer-neon uppercase">Restauração de Desastre</h3>
+              </div>
+              <p className="text-xs text-soccer-cream/70 font-sans leading-relaxed">
+                Restaure todas as coleções de reserva, jogos e bloqueios em caso de exclusões indesejadas no console do Firebase.
+              </p>
+
+              <div className="space-y-4 pt-2">
+                <div className="border border-dashed border-soccer-field/50 rounded-xl p-4 text-center cursor-pointer hover:bg-soccer-field/5 transition relative">
+                  <input
+                    type="file"
+                    accept=".json"
+                    onChange={handleFileSelectForRestore}
+                    className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                  />
+                  <Upload className="w-8 h-8 text-soccer-gold mx-auto mb-2" />
+                  <span className="block text-xs text-soccer-cream font-medium">
+                    {backupFileName ? backupFileName : "Selecione arquivo copaco_backup.json"}
+                  </span>
+                  <span className="block text-[10px] text-soccer-cream/50 mt-1">Apenas formato de backup oficial (.json)</span>
+                </div>
+
+                {backupFileContent && (
+                  <button
+                    onClick={handleRestoreBackup}
+                    className="w-full py-3 bg-soccer-neon text-soccer-cream font-display font-black text-xs rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-soccer-neon/25"
+                  >
+                    <CheckCircle2 className="w-4 h-4 text-soccer-cream" />
+                    Iniciar Restauração de Dados
+                  </button>
+                )}
+              </div>
+            </div>
+
+          </div>
+        </div>
       )}
 
     </div>

@@ -21,9 +21,10 @@ interface HeaderProps {
   isAdminMode: boolean;
   onToggleAdminMode: (active: boolean) => void;
   homepageTexts?: HomepageSettings;
+  onAdminVerified?: (isFirebaseAdmin: boolean) => void;
 }
 
-export default function Header({ isAdminMode, onToggleAdminMode, homepageTexts }: HeaderProps) {
+export default function Header({ isAdminMode, onToggleAdminMode, homepageTexts, onAdminVerified }: HeaderProps) {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [showLoginModal, setShowLoginModal] = useState(false);
@@ -45,25 +46,27 @@ export default function Header({ isAdminMode, onToggleAdminMode, homepageTexts }
         try {
           const idTokenResult = await user.getIdTokenResult();
           const isAdminClaim = !!idTokenResult.claims.admin;
+
           if (active) {
             if (isAdminClaim) {
               setFirebaseAdmin(true);
+              onAdminVerified?.(true);
               onToggleAdminMode(true);
               setAuthLoading(false);
               return;
             }
 
-            // Trust the secure admins collection lookup.
-            // Also permit verified bootstrapped creator email matching under production spec rules.
-            const emailIsBootstrap = user.email === "andrecalixtolima@gmail.com" && user.emailVerified;
+            // Trust the secure admins collection lookup or the authenticated custom claims.
             const adminDocRef = doc(db, "admins", user.uid);
             const adminDoc = await getDoc(adminDocRef);
             
-            if (adminDoc.exists() || emailIsBootstrap) {
+            if (adminDoc.exists()) {
               setFirebaseAdmin(true);
+              onAdminVerified?.(true);
               onToggleAdminMode(true);
             } else {
               setFirebaseAdmin(false);
+              onAdminVerified?.(false);
               onToggleAdminMode(localAdmin);
             }
           }
@@ -71,12 +74,14 @@ export default function Header({ isAdminMode, onToggleAdminMode, homepageTexts }
           console.error("Erro ao ler credenciais de admin no Firestore:", err);
           if (active) {
             setFirebaseAdmin(false);
+            onAdminVerified?.(false);
             onToggleAdminMode(localAdmin);
           }
         }
       } else {
         if (active) {
           setFirebaseAdmin(false);
+          onAdminVerified?.(false);
           onToggleAdminMode(localAdmin);
         }
       }
@@ -88,7 +93,7 @@ export default function Header({ isAdminMode, onToggleAdminMode, homepageTexts }
       active = false;
       unsubscribe();
     };
-  }, [onToggleAdminMode, localAdmin]);
+  }, [onToggleAdminMode, localAdmin, onAdminVerified]);
 
   const handleLogin = async () => {
     try {
@@ -122,6 +127,7 @@ export default function Header({ isAdminMode, onToggleAdminMode, homepageTexts }
       await signOut(auth);
       localStorage.removeItem("copaco_local_admin");
       setLocalAdmin(false);
+      onAdminVerified?.(false);
       onToggleAdminMode(false);
     } catch (e) {
       console.error("Logout Error:", e);

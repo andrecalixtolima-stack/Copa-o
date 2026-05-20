@@ -6,7 +6,7 @@
 import React, { useState, useEffect } from "react";
 import { Game, Reservation, BlockedTable } from "../types";
 import { db, handleFirestoreError, OperationType } from "../firebase";
-import { collection, addDoc, getDocs } from "firebase/firestore";
+import { collection, doc, writeBatch, getDocs } from "firebase/firestore";
 import { 
   X, Info, Phone, User, Users, Clipboard, ExternalLink, Check, AlertTriangle, HelpCircle, ChevronRight 
 } from "lucide-react";
@@ -32,6 +32,7 @@ export default function ReservationModal({
   // Form coordinates
   const [clientName, setClientName] = useState("");
   const [clientPhone, setClientPhone] = useState("");
+  const [nickname, setNickname] = useState(""); // Honeypot spam defense
   const [paxCount, setPaxCount] = useState<number>(4);
   const [tableType, setTableType] = useState<"mesa4" | "mesa2">("mesa4");
   const [selectedTableNumber, setSelectedTableNumber] = useState<number | null>(null);
@@ -83,6 +84,43 @@ export default function ReservationModal({
     e.preventDefault();
     setFormError("");
 
+    // 1. Anti-Spam: Honeypot trap check
+    if (nickname.trim().length > 0) {
+      console.warn("[ANTI-SPAM] Bot triggered honeypot. Simulating successful redirection.");
+      setLoading(true);
+      setTimeout(() => {
+        setCreatedReservation({
+          id: "spambot_trap_id_" + Math.random().toString(36).substring(2, 7).toUpperCase(),
+          gameId: game.id,
+          gameName: `${game.homeTeam} vs ${game.awayTeam}`,
+          gameDateTime: game.dateTime,
+          isBrazilGame: game.isBrazilGame,
+          clientName: clientName.trim(),
+          clientPhone: clientPhone.trim(),
+          paxCount: paxCount,
+          tableType: tableType,
+          tableNumber: selectedTableNumber || 1,
+          status: "confirmado",
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        });
+        setStep("success");
+        setLoading(false);
+      }, 1000);
+      return;
+    }
+
+    // 2. Anti-Spam: Rate Limit Device Cooldown (60 seconds)
+    const lastResTimeStr = localStorage.getItem("copaco_last_res_time");
+    if (lastResTimeStr) {
+      const diff = Date.now() - Number(lastResTimeStr);
+      if (diff < 60000) {
+        const secsLeft = Math.ceil((60000 - diff) / 1000);
+        setFormError(`Por razões de segurança contra spam, aguarde ${secsLeft} segundos para fazer uma nova reserva.`);
+        return;
+      }
+    }
+
     if (!clientName.trim()) {
       setFormError("Por favor, preencha o nome completo.");
       return;
@@ -116,30 +154,35 @@ export default function ReservationModal({
     setLoading(true);
 
     try {
-      const reservationData = {
-        gameId: game.id,
-        gameName: `${game.homeTeam} vs ${game.awayTeam}`,
-        gameDateTime: game.dateTime,
-        isBrazilGame: game.isBrazilGame,
-        clientName: clientName.trim(),
-        clientPhone: clientPhone.trim(),
-        paxCount: paxCount,
-        tableType: tableType,
-        tableNumber: selectedTableNumber,
-        status: (game.isBrazilGame ? "aguardando comprovante" : "confirmado") as any,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
+      const response = await fetch("/api/reservations/create", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          gameId: game.id,
+          gameName: `${game.homeTeam} vs ${game.awayTeam}`,
+          gameDateTime: game.dateTime,
+          isBrazilGame: game.isBrazilGame,
+          clientName: clientName.trim(),
+          clientPhone: clientPhone.trim(),
+          paxCount: paxCount,
+          tableType: tableType,
+          tableNumber: selectedTableNumber
+        })
+      });
 
-      const path = "reservations";
-      const docRef = await addDoc(collection(db, path), reservationData);
+      if (!response.ok) {
+        const errJson = await response.json();
+        throw new Error(errJson.error || "Não foi possível concluir sua reserva no servidor.");
+      }
+
+      const reservationData = await response.json();
       
-      const created: Reservation = {
-        id: docRef.id,
-        ...reservationData
-      } as any;
+      // Store timestamp to reinforce anti-spam
+      localStorage.setItem("copaco_last_res_time", Date.now().toString());
 
-      setCreatedReservation(created);
+      setCreatedReservation(reservationData);
 
       if (game.isBrazilGame) {
         setStep("payment");
@@ -147,7 +190,7 @@ export default function ReservationModal({
         setStep("success");
       }
     } catch (err: any) {
-      handleFirestoreError(err, OperationType.CREATE, "reservations");
+      setFormError(err.message || "Erro de conexão ao realizar reserva.");
     } finally {
       setLoading(false);
     }
@@ -177,7 +220,63 @@ export default function ReservationModal({
         </button>
 
         {/* Modal Content */}
-        <div className="p-6 md:p-10">
+        <div className="p-6 md:p-10 space-y-6">
+
+          {/* PROGRESS STEPS TIMELINE */}
+          <div className="w-full max-w-2xl mx-auto pb-4 relative z-20">
+            <div className="flex items-center justify-between relative">
+              
+              {/* Connector line */}
+              <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-white/10 -translate-y-1/2 z-0" />
+              <div 
+                className="absolute top-1/2 left-0 h-0.5 bg-gradient-to-r from-soccer-gold via-[#f97316] to-[#ec4899] -translate-y-1/2 z-0 transition-all duration-500"
+                style={{
+                  width: step === "details" ? "0%" : step === "payment" ? "50%" : "100%"
+                }}
+              />
+
+              {/* Step 1 indicator */}
+              <div className="relative z-10 flex flex-col items-center">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center font-mono text-xs font-black transition-all ${
+                  step === "details" 
+                    ? "bg-soccer-gold text-soccer-dark scale-110 ring-4 ring-yellow-500/20" 
+                    : "bg-soccer-field border-2 border-soccer-gold text-soccer-cream"
+                }`}>
+                  1
+                </div>
+                <span className="text-[10px] font-display font-medium text-white/70 uppercase tracking-tight mt-1.5 hidden sm:block">Mesa & Contato</span>
+              </div>
+
+              {/* Step 2 indicator */}
+              <div className="relative z-10 flex flex-col items-center">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center font-mono text-xs font-black transition-all ${
+                  step === "payment" 
+                    ? "bg-soccer-gold text-soccer-dark scale-110 ring-4 ring-yellow-500/20" 
+                    : step === "success" 
+                    ? "bg-soccer-field border-2 border-soccer-gold text-soccer-cream"
+                    : "bg-soccer-dark border border-white/15 text-white/40"
+                }`}>
+                  2
+                </div>
+                <span className="text-[10px] font-display font-medium text-white/70 uppercase tracking-tight mt-1.5 hidden sm:block font-sans">
+                  Garantia Pix
+                </span>
+              </div>
+
+              {/* Step 3 indicator */}
+              <div className="relative z-10 flex flex-col items-center">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center font-mono text-xs font-black transition-all ${
+                  step === "success" 
+                    ? "bg-soccer-gold text-soccer-dark scale-110 ring-4 ring-yellow-500/20" 
+                    : "bg-soccer-dark border border-white/10 text-white/40"
+                }`}>
+                  3
+                </div>
+                <span className="text-[10px] font-display font-medium text-white/70 uppercase tracking-tight mt-1.5 hidden sm:block">Sucesso!</span>
+              </div>
+
+            </div>
+          </div>
 
           {/* STEP 1: FILL DETAILS & SELECT TABLES */}
           {step === "details" && (
@@ -228,6 +327,19 @@ export default function ReservationModal({
                           className="w-full bg-[#03150b] border border-soccer-field focus:border-soccer-gold text-soccer-cream rounded-xl py-2.5 pl-10 pr-4 text-xs outline-none transition-all"
                         />
                       </div>
+                    </div>
+
+                    {/* Honeypot hidden input for anti-spam */}
+                    <div className="absolute hidden w-0 h-0 overflow-hidden pointer-events-none" aria-hidden="true">
+                      <input
+                        id="form_nickname_field"
+                        type="text"
+                        tabIndex={-1}
+                        autoComplete="off"
+                        value={nickname}
+                        onChange={(e) => setNickname(e.target.value)}
+                        placeholder="Your Nickname"
+                      />
                     </div>
 
                     {/* Guest Phone */}

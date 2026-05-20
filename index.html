@@ -1,13 +1,40 @@
 <!doctype html>
-<html lang="en">
+<html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>My Google AI Studio App</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>COPAÇO no Quinteiro — Reservas Premium em Tempo Real</title>
+    
+    <!-- Meta tags de SEO e Social -->
+    <meta name="description" content="Garanta seu lugar no Quinteiro! Faça sua reserva em tempo real para os jogos da Copa do Mundo com nosso sistema interativo premium." />
+    <meta name="theme-color" content="#f1c40f" />
+    
+    <!-- Open Graph (Facebook / WhatsApp / Slack) -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="COPAÇO no Quinteiro — Reservas Premium" />
+    <meta property="og:description" content="Não perca nenhum lance! Sistema em tempo real de reserva de mesas oficiais no Bar Quinteiro." />
+    <meta property="og:image" content="https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&q=80&w=1200" />
+    
+    <!-- Twitter Cards -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="COPAÇO no Quinteiro" />
+    <meta name="twitter:description" content="Reserve sua mesa de forma interativa e com confirmação instantânea." />
+    <meta name="twitter:image" content="https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&q=80&w=600" />
+
+    <!-- Favicon e PWA Mobile Headers -->
+    <link rel="icon" type="image/png" href="https://img.icons8.com/color/48/soccer-ball.png" />
+    <link rel="apple-touch-icon" href="https://img.icons8.com/color/192/soccer-ball.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="manifest" href="/manifest.json" />
+
+    <!-- Google Display Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Inter:wght@300;400;500;600;700;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet" />
   </head>
-  <body>
+  <body class="bg-[#02120a] text-amber-50 selection:bg-yellow-500 selection:text-black">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-

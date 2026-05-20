@@ -1,0 +1,22 @@
+{
+  "short_name": "COPAÇO",
+  "name": "COPAÇO no Quinteiro",
+  "description": "Sistema completo premium para reservas de mesas em tempo real durante jogos no Bar Quinteiro.",
+  "icons": [
+    {
+      "src": "https://img.icons8.com/color/192/soccer-ball.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "https://img.icons8.com/color/512/soccer-ball.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#02120a",
+  "theme_color": "#f1c40f",
+  "display": "standalone",
+  "orientation": "portrait"
+}

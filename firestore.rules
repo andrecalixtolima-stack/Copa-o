@@ -1,54 +1,166 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Default safe fallback rule
+    
+    // ----------------------------------------------------
+    // GLOBAL DEFAULT DENY SAFETY NET
+    // ----------------------------------------------------
     match /{document=**} {
       allow read, write: if false;
     }
 
-    // Checking if user is Administrator based on known email or admins database collection
+    // ----------------------------------------------------
+    // HEURISTICS & REUSABLE HARDENED HELPERS (ABAC)
+    // ----------------------------------------------------
+    
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
     function isAdmin() {
-      return request.auth != null && (
-        request.auth.token.email == "andrecalixtolima@gmail.com" ||
+      return isSignedIn() && (
+        request.auth.token.admin == true ||
+        (request.auth.token.email == 'andrecalixtolima@gmail.com' && request.auth.token.email_verified == true) ||
         exists(/databases/$(database)/documents/admins/$(request.auth.uid))
       );
     }
 
-    // Games are viewable by anyone, editable only by admins
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // Reservation Schema validation helper (Pillar 2: Anti-Update-Gap)
+    function isValidReservation(data) {
+      return data.keys().hasAll([
+        'gameId', 'gameName', 'gameDateTime', 'isBrazilGame',
+        'clientName', 'clientPhone', 'paxCount', 'tableType',
+        'tableNumber', 'status', 'createdAt', 'updatedAt'
+      ]) 
+      && data.keys().size() <= 14 // Allowing optional 'id' or 'paymentProofUrl'
+      && data.gameId is string && data.gameId.size() <= 128
+      && data.gameName is string && data.gameName.size() <= 100
+      && data.gameDateTime is string && data.gameDateTime.size() <= 40
+      && data.isBrazilGame is bool
+      && data.clientName is string && data.clientName.size() >= 2 && data.clientName.size() <= 100
+      && data.clientPhone is string && data.clientPhone.size() >= 8 && data.clientPhone.size() <= 30
+      && data.paxCount is int && data.paxCount >= 1 && data.paxCount <= 4
+      && (data.tableType == 'mesa4' || data.tableType == 'mesa2')
+      && data.tableNumber is int && data.tableNumber >= 1 && data.tableNumber <= 50
+      && data.status is string 
+      && (
+        data.status == 'aguardando comprovante' || 
+        data.status == 'confirmado' || 
+        data.status == 'cancelado' || 
+        data.status == 'liberada automaticamente' || 
+        data.status == 'ativa'
+      )
+      && data.createdAt is string && data.createdAt.size() <= 40
+      && data.updatedAt is string && data.updatedAt.size() <= 40
+      // Table compatibility/pax rules
+      && (data.tableType == 'mesa4' || data.paxCount <= 2);
+    }
+
+    // Availability Schema validation helper
+    function isValidAvailability(data) {
+      return data.keys().hasAll(['reservationId', 'gameId', 'tableType', 'tableNumber', 'status', 'updatedAt'])
+      && data.keys().size() <= 7
+      && data.reservationId is string && data.reservationId.size() <= 128
+      && data.gameId is string && data.gameId.size() <= 128
+      && (data.tableType == 'mesa4' || data.tableType == 'mesa2')
+      && data.tableNumber is int && data.tableNumber >= 1 && data.tableNumber <= 50
+      && data.status is string
+      && data.updatedAt is string && data.updatedAt.size() <= 40;
+    }
+
+    // ----------------------------------------------------
+    // COLLECTION ENDPOINTS MATCHERS
+    // ----------------------------------------------------
+
+    // Games: Public read, Admin write
     match /games/{gameId} {
       allow read: if true;
       allow create, update, delete: if isAdmin();
     }
 
-    // Reservations are viewable by anyone (to check table occupancy in real time),
-    // writeable by clients making brand new bookings, and fully managed by admins.
-    // Additionally, unauthenticated clients can execute background expiration actions on free, stale games.
-    match /reservations/{reservationId} {
+    // Public derived table availability index (PII-free)
+    match /availability/{availabilityId} {
       allow read: if true;
-      allow create: if true;
-      allow update: if isAdmin() || (
-        // Client-side self-healing backup: can set expired free reservations to released
-        request.resource.data.status == "liberada automaticamente" &&
-        resource.data.isBrazilGame == false
+      
+      // Strict Atomic Locking: prevent collision & double bookings
+      allow create: if isValidId(availabilityId) 
+        && isValidAvailability(request.resource.data)
+        // Prevent registering a table that is already reserved
+        && !exists(/databases/$(database)/documents/availability/$(availabilityId));
+
+      allow update: if isValidAvailability(request.resource.data) && (
+        isAdmin() || (
+          // Allow client background sync to update availability when reservation status matches
+          exists(/databases/$(database)/documents/reservations/$(request.resource.data.reservationId))
+          && get(/databases/$(database)/documents/reservations/$(request.resource.data.reservationId)).data.status == request.resource.data.status
+        )
       );
+
+      allow delete: if isAdmin() || (
+        // Allow automatic cleaning client or background process to free table if reservation was marked expired
+        exists(/databases/$(database)/documents/reservations/$(resource.data.reservationId))
+        && get(/databases/$(database)/documents/reservations/$(resource.data.reservationId)).data.status == "liberada automaticamente"
+      );
+    }
+
+    // Secure Reservations: Full admin control, strictly guarded PII
+    match /reservations/{reservationId} {
+      // 1. PUBLIC CANNOT LIST COMPLETE RESERVATIONS COLLECTION (PII Isolation)
+      allow list: if isAdmin();
+      
+      // Get single reservation allowed so clients can see their own booking tickets
+      allow get: if true;
+
+      // Create booking validation
+      allow create: if isValidId(reservationId)
+        && isValidReservation(request.resource.data)
+        && (
+          isAdmin() ||
+          (
+            // Unauthenticated creation restricts initial status based on game rules
+            (request.resource.data.isBrazilGame == true && request.resource.data.status == "aguardando comprovante") ||
+            (request.resource.data.isBrazilGame == false && request.resource.data.status == "confirmado")
+          )
+        )
+        // Force valid foreign game key
+        && exists(/databases/$(database)/documents/games/$(request.resource.data.gameId));
+
+      // Guarded updates
+      allow update: if isValidReservation(request.resource.data) && (
+        isAdmin() ||
+        (
+          // Anti-sabotage status release (only free bookings can automatically clean up)
+          request.resource.data.status == "liberada automaticamente"
+          && resource.data.status != "liberada automaticamente"
+          && resource.data.isBrazilGame == false
+          // Absolute field lock - zero other edits allowed to prevent malicious updates of name/phones
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
+        )
+      );
+
       allow delete: if isAdmin();
     }
 
-    // Blocked tables can be viewed by anyone, edited only by admins
+    // Blocked Tables: Public read, Admin write
     match /blockedTables/{blockedId} {
       allow read: if true;
       allow write: if isAdmin();
     }
 
-    // Homepage and branding settings are viewable by anyone, editable only by admins
+    // Institutional setting & branding: Public read, Admin write
     match /settings/{settingsId} {
       allow read: if true;
       allow write: if isAdmin();
     }
 
-    // Admins metadata collection
+    // Admin authorization document mapping
     match /admins/{adminId} {
       allow read, write: if isAdmin();
     }
+
   }
 }

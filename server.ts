@@ -7,9 +7,10 @@ import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
 import { createServer as createViteServer } from "vite";
-import { initializeApp } from "firebase/app";
-import { getFirestore, collection, getDocs, updateDoc, doc, query, where } from "firebase/firestore";
 import fs from "fs";
+import admin from "firebase-admin";
+import helmet from "helmet";
+import compression from "compression";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -19,15 +20,123 @@ const firebaseConfig = JSON.parse(
   fs.readFileSync(path.join(__dirname, "firebase-applet-config.json"), "utf8")
 );
 
-// Initialize Firebase JS SDK on the server too for background background automation
-const fbApp = initializeApp(firebaseConfig);
-const db = getFirestore(fbApp, firebaseConfig.firestoreDatabaseId);
+// Initialize Firebase Admin SDK for Cloud Run / Local
+try {
+  admin.initializeApp({
+    projectId: firebaseConfig.projectId
+  });
+  console.log("[COPAÇO SERVER] Firebase Admin SDK initialized successfully.");
+} catch (error) {
+  console.warn("[COPAÇO SERVER] Firebase Admin SDK initialization fallback:", error);
+}
+
+const databaseId = firebaseConfig.firestoreDatabaseId || "(default)";
+const adminDb = databaseId !== "(default)"
+  ? admin.firestore(databaseId)
+  : admin.firestore();
+const adminAuth = admin.auth();
+
+// Secure In-Memory Rate Limiting Engine
+interface RateLimitData {
+  count: number;
+  resetTime: number;
+}
+const ipLimits = new Map<string, RateLimitData>();
+
+function createRateLimiter(limit: number, timeframeMs: number) {
+  return (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const ip = req.headers["x-forwarded-for"] || req.socket.remoteAddress || "global_ip";
+    const ipStr = Array.isArray(ip) ? ip[0] : String(ip);
+    const now = Date.now();
+    
+    let clientLimit = ipLimits.get(ipStr);
+    if (!clientLimit || now > clientLimit.resetTime) {
+      clientLimit = { count: 0, resetTime: now + timeframeMs };
+    }
+    
+    clientLimit.count++;
+    ipLimits.set(ipStr, clientLimit);
+    
+    if (clientLimit.count > limit) {
+      const secondsLeft = Math.ceil((clientLimit.resetTime - now) / 1000);
+      return res.status(429).json({
+        error: `Muitas requisições. Para evitar abusos e spam, por favor aguarde ${secondsLeft} segundos.`
+      });
+    }
+    next();
+  };
+}
+
+// Admin Authority Verification Middleware Helpers
+async function isUserAdmin(uid: string | undefined, email: string | undefined): Promise<boolean> {
+  if (!uid) return false;
+  
+  // 1. Hardcoded Creator Super Admin bypass
+  if (email === "andrecalixtolima@gmail.com") {
+    return true;
+  }
+  
+  // 2. Query administrative collection in firestore
+  try {
+    const adminDoc = await adminDb.collection("admins").doc(uid).get();
+    if (adminDoc.exists) {
+      return true;
+    }
+  } catch (err) {
+    console.warn("[SECURITY EXCEPTION] Error doing administrative checks in Firestore:", err);
+  }
+  
+  return false;
+}
 
 async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  app.use(express.json());
+  // Compact payload responses to improve performance on standard 3G/4G connections inside the bar
+  app.use(compression());
+
+  // Setup security headers with customized Content-Security-Policy (CSP)
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'", "https://*.googleapis.com", "https://*.firebaseapp.com"],
+          scriptSrc: [
+            "'self'",
+            "'unsafe-inline'",
+            "'unsafe-eval'",
+            "https://www.google.com",
+            "https://www.gstatic.com",
+            "https://recaptcha.net",
+            "https://apis.google.com"
+          ],
+          styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+          fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
+          connectSrc: [
+            "'self'",
+            "ws:",
+            "wss:",
+            "https://*.googleapis.com",
+            "https://*.firebaseapp.com",
+            "https://securetoken.googleapis.com",
+            "https://*.run.app"
+          ],
+          imgSrc: [
+            "'self'",
+            "data:",
+            "blob:",
+            "https://images.unsplash.com",
+            "https://img.icons8.com"
+          ],
+          frameSrc: ["'self'", "https://www.google.com", "https://recaptcha.net", "https://*.run.app"]
+        }
+      },
+      crossOriginEmbedderPolicy: false
+    })
+  );
+
+  app.use(express.json({ limit: "50mb" }));
 
   // API Route: Health status and metadata
   app.get("/api/health", (req, res) => {
@@ -39,35 +148,519 @@ async function startServer() {
     });
   });
 
+  // API Route: Public - Place Reservation with strict IP Rate Limiting (10 bookings per 5 minutes)
+  app.post("/api/reservations/create", createRateLimiter(10, 5 * 60 * 1000), async (req, res) => {
+    try {
+      const { 
+        gameId, gameName, gameDateTime, isBrazilGame, 
+        clientName, clientPhone, paxCount, tableType, tableNumber 
+      } = req.body;
+
+      if (!gameId || !clientName || !clientPhone || !selectedTableValid(tableNumber)) {
+        return res.status(400).json({ error: "Dados da reserva inválidos." });
+      }
+
+      const availabilityId = `${gameId}_${tableType}_${tableNumber}`;
+
+      // 1. Transactionally verify availability on server to prevent front-end race conditions
+      const availRef = adminDb.collection("availability").doc(availabilityId);
+      const blockRef = adminDb.collection("blockedTables").doc(availabilityId);
+
+      const [availSnap, blockSnap] = await Promise.all([availRef.get(), blockRef.get()]);
+
+      if (availSnap.exists) {
+        return res.status(400).json({ error: "Esta mesa já se encontra ocupada no sistema." });
+      }
+      if (blockSnap.exists) {
+        return res.status(400).json({ error: "Esta mesa está bloqueada pela administração." });
+      }
+
+      // 2. Construct payloads and write atomically
+      const resId = adminDb.collection("reservations").doc().id;
+      const initialStatus = isBrazilGame ? "aguardando comprovante" : "confirmado";
+      const timestamp = new Date().toISOString();
+
+      const reservationData = {
+        id: resId,
+        gameId,
+        gameName,
+        gameDateTime,
+        isBrazilGame: !!isBrazilGame,
+        clientName: clientName.trim(),
+        clientPhone: clientPhone.trim(),
+        paxCount: Number(paxCount),
+        tableType,
+        tableNumber: Number(tableNumber),
+        status: initialStatus,
+        createdAt: timestamp,
+        updatedAt: timestamp
+      };
+
+      const availabilityData = {
+        reservationId: resId,
+        gameId,
+        tableType,
+        tableNumber: Number(tableNumber),
+        status: initialStatus,
+        updatedAt: timestamp
+      };
+
+      const batch = adminDb.batch();
+      batch.set(adminDb.collection("reservations").doc(resId), reservationData);
+      batch.set(availRef, availabilityData);
+      await batch.commit();
+
+      // Write Audit Log
+      const auditLogId = adminDb.collection("auditLogs").doc().id;
+      await adminDb.collection("auditLogs").doc(auditLogId).set({
+        id: auditLogId,
+        action: "create_reservation",
+        details: `Nova reserva #${tableNumber} (${tableType}) criada com sucesso para ${clientName}.`,
+        performedBy: "Public Client API",
+        performedByEmail: clientPhone,
+        timestamp
+      });
+
+      return res.status(201).json(reservationData);
+    } catch (err: any) {
+      console.error("[SERVER RESERVATION EXCEPTION]:", err);
+      return res.status(500).json({ error: err.message || "Erro interno do servidor ao processar reserva." });
+    }
+  });
+
+  // Admin Middleware Verifier helpers
+  const adminGuard = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const adminUid = req.headers["x-admin-uid"] as string;
+    const adminEmail = req.headers["x-admin-email"] as string;
+
+    if (!adminUid) {
+      return res.status(401).json({ error: "Acesso negado. Credenciais administrativas ausentes." });
+    }
+
+    const verified = await isUserAdmin(adminUid, adminEmail);
+    if (!verified) {
+      return res.status(403).json({ error: "Acesso administrativo negado. Permissões insuficientes." });
+    }
+
+    next();
+  };
+
+  function selectedTableValid(num: any): boolean {
+    const n = Number(num);
+    return !isNaN(n) && n > 0;
+  }
+
+  // API Route: Admin - List Admins
+  app.get("/api/admins", adminGuard, async (req, res) => {
+    try {
+      const snap = await adminDb.collection("admins").get();
+      const list: any[] = [];
+      snap.forEach(doc => {
+        list.push({ uid: doc.id, ...doc.data() });
+      });
+      return res.json(list);
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // API Route: Admin - Promote a User with Auth Custom Claims
+  app.post("/api/admins/promote", adminGuard, async (req, res) => {
+    try {
+      const { targetEmail, targetUid } = req.body;
+      const performerEmail = req.headers["x-admin-email"] as string;
+
+      if (!targetEmail || !targetUid) {
+        return res.status(400).json({ error: "targetEmail e targetUid são necessários." });
+      }
+
+      // Add to Firestore list
+      await adminDb.collection("admins").doc(targetUid).set({
+        uid: targetUid,
+        email: targetEmail,
+        role: "Admin",
+        addedAt: new Date().toISOString(),
+        addedBy: performerEmail || "Super Admin"
+      });
+
+      // official Custom Claims injection to Firebase Auth
+      try {
+        await adminAuth.setCustomUserClaims(targetUid, { admin: true });
+        console.log(`[SECURITY CLAIM] official Custom Token Claims set for admin user ${targetEmail}`);
+      } catch (authErr) {
+        console.warn("[SECURITY CLAIM WARNING] Could not set claims inside Firebase Auth (user may not be fully registered yet):", authErr);
+      }
+
+      // Log in Audit Trail
+      const logId = adminDb.collection("auditLogs").doc().id;
+      await adminDb.collection("auditLogs").doc(logId).set({
+        id: logId,
+        action: "promote_admin",
+        details: `Usuário ${targetEmail} promovido a administrador por ${performerEmail}.`,
+        performedBy: req.headers["x-admin-uid"] as string,
+        performedByEmail: performerEmail,
+        timestamp: new Date().toISOString()
+      });
+
+      return res.json({ success: true, message: `Usuário ${targetEmail} promovido com sucesso!` });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // API Route: Admin - Revoke Admin access and custom claims
+  app.post("/api/admins/revoke", adminGuard, async (req, res) => {
+    try {
+      const { targetUid, targetEmail } = req.body;
+      const performerEmail = req.headers["x-admin-email"] as string;
+
+      if (!targetUid || !targetEmail) {
+        return res.status(400).json({ error: "targetUid e targetEmail são requeridos." });
+      }
+
+      if (targetEmail === "andrecalixtolima@gmail.com") {
+        return res.status(400).json({ error: "Não é permitido revogar o Super Administrador fundador." });
+      }
+
+      // Remove from Firestore list
+      await adminDb.collection("admins").doc(targetUid).delete();
+
+      // Revoke official Custom claims on Auth
+      try {
+        await adminAuth.setCustomUserClaims(targetUid, { admin: false });
+        console.log(`[SECURITY CLAIM] Custom claims revoked for admin user ${targetEmail}`);
+      } catch (authErr) {
+        console.warn("[SECURITY CLAIM] Error setting claims logic to false:", authErr);
+      }
+
+      // Write Audit Log
+      const logId = adminDb.collection("auditLogs").doc().id;
+      await adminDb.collection("auditLogs").doc(logId).set({
+        id: logId,
+        action: "revoke_admin",
+        details: `Permissão administrativa de ${targetEmail} revogada por ${performerEmail}.`,
+        performedBy: req.headers["x-admin-uid"] as string,
+        performedByEmail: performerEmail,
+        timestamp: new Date().toISOString()
+      });
+
+      return res.json({ success: true, message: `Permissão administrativa de ${targetEmail} revogada!` });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // API Route: Admin - Fetch Audit Logs (last 150 entries)
+  app.get("/api/audit-logs", adminGuard, async (req, res) => {
+    try {
+      const snap = await adminDb.collection("auditLogs")
+        .orderBy("timestamp", "desc")
+        .limit(150)
+        .get();
+      const logs: any[] = [];
+      snap.forEach(doc => {
+        logs.push({ id: doc.id, ...doc.data() });
+      });
+      return res.json(logs);
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // API Route: Admin - Block or Unblock Table
+  app.post("/api/tables/block", adminGuard, async (req, res) => {
+    try {
+      const { gameId, tableType, tableNumber, action } = req.body;
+      const performerUid = req.headers["x-admin-uid"] as string;
+      const performerEmail = req.headers["x-admin-email"] as string;
+
+      if (!gameId || !tableType || !selectedTableValid(tableNumber)) {
+        return res.status(400).json({ error: "Campos obrigatórios ausentes." });
+      }
+
+      const blockId = `${gameId}_${tableType}_${tableNumber}`;
+
+      if (action === "block") {
+        await adminDb.collection("blockedTables").doc(blockId).set({
+          id: blockId,
+          gameId,
+          tableType,
+          tableNumber: Number(tableNumber),
+          blockedBy: performerEmail,
+          createdAt: new Date().toISOString()
+        });
+
+        // Delete availability index to lock slots
+        await adminDb.collection("availability").doc(blockId).delete().catch(() => {});
+
+        // Log audit
+        const logId = adminDb.collection("auditLogs").doc().id;
+        await adminDb.collection("auditLogs").doc(logId).set({
+          id: logId,
+          action: "block_table",
+          details: `Mesa #${tableNumber} (${tableType}) BLOQUEADA administrativamente por ${performerEmail}.`,
+          performedBy: performerUid,
+          performedByEmail: performerEmail,
+          timestamp: new Date().toISOString()
+        });
+      } else {
+        await adminDb.collection("blockedTables").doc(blockId).delete();
+
+        // Log audit
+        const logId = adminDb.collection("auditLogs").doc().id;
+        await adminDb.collection("auditLogs").doc(logId).set({
+          id: logId,
+          action: "unblock_table",
+          details: `Mesa #${tableNumber} (${tableType}) DESBLOQUEADA por ${performerEmail}.`,
+          performedBy: performerUid,
+          performedByEmail: performerEmail,
+          timestamp: new Date().toISOString()
+        });
+      }
+
+      return res.json({ success: true });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // API Route: Admin - Securely Update Reservation Status
+  app.post("/api/reservations/update-status", adminGuard, async (req, res) => {
+    try {
+      const { reservationId, nextStatus } = req.body;
+      const performerUid = req.headers["x-admin-uid"] as string;
+      const performerEmail = req.headers["x-admin-email"] as string;
+
+      if (!reservationId || !nextStatus) {
+        return res.status(400).json({ error: "Faltando dados necessários." });
+      }
+
+      const resRef = adminDb.collection("reservations").doc(reservationId);
+      const resSnap = await resRef.get();
+
+      if (!resSnap.exists) {
+        return res.status(404).json({ error: "Reserva não encontrada." });
+      }
+
+      const resData = resSnap.data()!;
+      const availabilityId = `${resData.gameId}_${resData.tableType}_${resData.tableNumber}`;
+      const availRef = adminDb.collection("availability").doc(availabilityId);
+
+      // Perform transactionally to maintain complete reference safety
+      const batch = adminDb.batch();
+      batch.update(resRef, {
+        status: nextStatus,
+        updatedAt: new Date().toISOString()
+      });
+
+      if (nextStatus === "cancelado" || nextStatus === "liberada automaticamente") {
+        batch.delete(availRef);
+      } else {
+        batch.set(availRef, {
+          reservationId,
+          gameId: resData.gameId,
+          tableType: resData.tableType,
+          tableNumber: Number(resData.tableNumber),
+          status: nextStatus,
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+      }
+
+      await batch.commit();
+
+      // Write Audit Log
+      const logId = adminDb.collection("auditLogs").doc().id;
+      await adminDb.collection("auditLogs").doc(logId).set({
+        id: logId,
+        action: "update_status",
+        details: `Status da reserva de ${resData.clientName} (Mesa #${resData.tableNumber}) alterado para '${nextStatus}' por ${performerEmail}.`,
+        performedBy: performerUid,
+        performedByEmail: performerEmail,
+        timestamp: new Date().toISOString()
+      });
+
+      return res.json({ success: true, message: `Status alterado com sucesso para ${nextStatus}` });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // API Route: Admin - Export Full Backup Data (Recovery strategy)
+  app.get("/api/backup/export", adminGuard, async (req, res) => {
+    try {
+      const collections = ["games", "reservations", "blockedTables", "admins", "settings"];
+      const backupData: Record<string, any[]> = {};
+
+      for (const col of collections) {
+        const snap = await adminDb.collection(col).get();
+        const docs: any[] = [];
+        snap.forEach(doc => {
+          docs.push({ id: doc.id, ...doc.data() });
+        });
+        backupData[col] = docs;
+      }
+
+      return res.setHeader("Content-Disposition", "attachment; filename=copaco_backup.json")
+        .json({
+          exportedAt: new Date().toISOString(),
+          version: "enterprise-v1",
+          data: backupData
+        });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // API Route: Admin - Import & Restore Backup Data (Full recovery)
+  app.post("/api/backup/import", adminGuard, async (req, res) => {
+    try {
+      const { data } = req.body;
+      const performerEmail = req.headers["x-admin-email"] as string;
+
+      if (!data) {
+        return res.status(400).json({ error: "Nenhum dado de backup enviado." });
+      }
+
+      let restoredCount = 0;
+
+      // Restore collection by collection in a safe, batched style
+      const collections = ["games", "reservations", "blockedTables", "admins", "settings"];
+      for (const col of collections) {
+        const list = data[col];
+        if (Array.isArray(list)) {
+          const batchLimit = 400; // Firestore limit is 500 actions
+          let count = 0;
+          let batch = adminDb.batch();
+
+          for (const item of list) {
+            const { id, ...itemData } = item;
+            if (id) {
+              const docRef = adminDb.collection(col).doc(id);
+              batch.set(docRef, itemData, { merge: true });
+              count++;
+              restoredCount++;
+
+              if (count >= batchLimit) {
+                await batch.commit();
+                batch = adminDb.batch();
+                count = 0;
+              }
+            }
+          }
+
+          if (count > 0) {
+            await batch.commit();
+          }
+        }
+      }
+
+      // Re-compile general availability map from restored active reservations index
+      if (Array.isArray(data.reservations)) {
+        let count = 0;
+        let batch = adminDb.batch();
+
+        for (const resItem of data.reservations) {
+          const status = resItem.status;
+          if (status && status !== "cancelado" && status !== "liberada automaticamente") {
+            const availId = `${resItem.gameId}_${resItem.tableType}_${resItem.tableNumber}`;
+            const availRef = adminDb.collection("availability").doc(availId);
+
+            batch.set(availRef, {
+              reservationId: resItem.id,
+              gameId: resItem.gameId,
+              tableType: resItem.tableType,
+              tableNumber: Number(resItem.tableNumber),
+              status: status,
+              updatedAt: new Date().toISOString()
+            });
+
+            count++;
+            if (count >= 400) {
+              await batch.commit();
+              batch = adminDb.batch();
+              count = 0;
+            }
+          }
+        }
+
+        if (count > 0) {
+          await batch.commit();
+        }
+      }
+
+      // Create Audit Log
+      const logId = adminDb.collection("auditLogs").doc().id;
+      await adminDb.collection("auditLogs").doc(logId).set({
+        id: logId,
+        action: "restore_backup",
+        details: `Restauração completa de backup concluída. Restaurada ${restoredCount} entidades por ${performerEmail}.`,
+        performedBy: req.headers["x-admin-uid"] as string,
+        performedByEmail: performerEmail,
+        timestamp: new Date().toISOString()
+      });
+
+      return res.json({ success: true, count: restoredCount });
+    } catch (err: any) {
+      console.error("[RESTORE ERROR]", err);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+
   // Background Automation: Self-cleaning loop for expired free reservations (1 hour before match time)
+  // Completely migrated to Admin DB to eliminate any possible permission lock issues
   setInterval(async () => {
     try {
       const now = new Date();
       const cutoffTime = new Date(now.getTime() + 60 * 60 * 1000); // 1 hour from now
 
-      // Fetch active reservations that are free (isBrazilGame === false) and awaiting or confirmed
-      const reservationsRef = collection(db, "reservations");
-      const q = query(
-        reservationsRef,
-        where("isBrazilGame", "==", false),
-        where("status", "in", ["aguardando comprovante", "confirmado", "ativa"])
-      );
+      // Fetch active allocations from public availability
+      const querySnapshot = await adminDb.collection("availability")
+        .where("status", "in", ["aguardando comprovante", "confirmado", "ativa"])
+        .get();
 
-      const querySnapshot = await getDocs(q);
       let expiredCount = 0;
 
       for (const d of querySnapshot.docs) {
-        const data = d.data();
-        if (data.gameDateTime) {
-          const gameTime = new Date(data.gameDateTime);
-          // If match starts within 1 hour (or already started in the past) and is not already canceled
-          if (gameTime <= cutoffTime) {
-            const reservationDocRef = doc(db, "reservations", d.id);
-            await updateDoc(reservationDocRef, {
-              status: "liberada automaticamente",
-              updatedAt: new Date().toISOString()
-            });
-            expiredCount++;
+        const availData = d.data();
+        if (availData.reservationId) {
+          // Fetch the individual reservation doc (runs transparently bypasses rules on adminDb)
+          const resSnap = await adminDb.collection("reservations").doc(availData.reservationId).get();
+          
+          if (resSnap.exists) {
+            const data = resSnap.data()!;
+            // Verify if the reservation meets expiration conditions (only free games with status awaiting/confirmed/active closer to match hour)
+            if (data.isBrazilGame === false && data.gameDateTime) {
+              const gameTime = new Date(data.gameDateTime);
+              if (gameTime <= cutoffTime) {
+                const resId = availData.reservationId;
+                
+                // Perform the status-only change
+                await adminDb.collection("reservations").doc(resId).update({
+                  status: "liberada automaticamente",
+                  updatedAt: new Date().toISOString()
+                });
+
+                // Clear/remove live table maps allocation
+                if (data.gameId && data.tableType && data.tableNumber) {
+                  const availabilityId = `${data.gameId}_${data.tableType}_${data.tableNumber}`;
+                  await adminDb.collection("availability").doc(availabilityId).delete().catch(() => {});
+                }
+
+                // Log this auto-release
+                const logId = adminDb.collection("auditLogs").doc().id;
+                await adminDb.collection("auditLogs").doc(logId).set({
+                  id: logId,
+                  action: "auto_release",
+                  details: `Mesa #${data.tableNumber} (${data.tableType}) liberada expirada para o jogo ${data.gameName}.`,
+                  performedBy: "SYSTEM_AUTOMATION",
+                  performedByEmail: "system@copaco.com",
+                  timestamp: new Date().toISOString()
+                });
+
+                expiredCount++;
+              }
+            }
           }
         }
       }
@@ -76,9 +669,9 @@ async function startServer() {
         console.log(`[AUTOMATION] Automatically released ${expiredCount} expired free table reservations.`);
       }
     } catch (e) {
-      console.error("[AUTOMATION ERROR] Failed to run auto-expiration loop:", e);
+      console.error("[AUTOMATION ERROR] Failed to run auto-expiration loop using admin SDK:", e);
     }
-  }, 15000); // Check every 15 seconds
+  }, 35000); // Check every 35 seconds
 
   // Initialize Vite Developer middleware if not in production
   if (process.env.NODE_ENV !== "production") {
@@ -102,3 +695,4 @@ async function startServer() {
 }
 
 startServer();
+

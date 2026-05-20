@@ -1,0 +1,16 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /{allPaths=**} {
+      // Allow public read-only access for logos, images and proofs
+      allow read: if true;
+      
+      // Allow writes ONLY under strict validation criteria
+      allow write: if request.auth != null
+        // 1. Validate MIME-type (must be an image)
+        && request.resource.contentType.matches('image/.*')
+        // 2. Validate maximum allowed file size (limit to 5MB to block wallet depletion)
+        && request.resource.size < 5 * 1024 * 1024;
+    }
+  }
+}

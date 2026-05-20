@@ -42,12 +42,13 @@ export default function App() {
   
   const [loading, setLoading] = useState(true);
   const [isAdminMode, setIsAdminMode] = useState(false);
+  const [isFirebaseAdmin, setIsFirebaseAdmin] = useState(false);
   const [selectedGame, setSelectedGame] = useState<Game | null>(null);
 
   const [seeding, setSeeding] = useState(false);
   const [connectionError, setConnectionError] = useState<{ message: string; code?: string; path?: string } | null>(null);
 
-  // Subscribe to real-time collections
+  // Subscribe to real-time collections (games, blockedTables, texts)
   useEffect(() => {
     setLoading(true);
 
@@ -70,27 +71,6 @@ export default function App() {
           handleFirestoreError(err, OperationType.GET, "games");
         } catch (e) {
           console.warn("Muted error throw inside games onSnapshot callback to maintain React rendering context.");
-        }
-      }
-    );
-
-    const unsubReservations = onSnapshot(
-      collection(db, "reservations"),
-      (snap) => {
-        const list: Reservation[] = [];
-        snap.forEach((doc) => {
-          list.push({ id: doc.id, ...doc.data() } as Reservation);
-        });
-        setReservations(list);
-        setConnectionError(null);
-      },
-      (err) => {
-        console.error("onSnapshot error in collection 'reservations':", err);
-        setConnectionError({ message: err.message, code: (err as any).code, path: "reservations" });
-        try {
-          handleFirestoreError(err, OperationType.GET, "reservations");
-        } catch (e) {
-          console.warn("Muted error throw inside reservations onSnapshot callback to maintain React rendering context.");
         }
       }
     );
@@ -126,17 +106,80 @@ export default function App() {
       },
       (err) => {
         console.warn("Error loading homepage settings:", err);
-        // Do not fail the whole page if settings are missing
       }
     );
 
     return () => {
       unsubGames();
-      unsubReservations();
       unsubBlocks();
       unsubTexts();
     };
   }, []);
+
+  // Secure PII Isolation: Dynamic loader for reservation feed based on role / Admin mode Active
+  useEffect(() => {
+    let unsubReservations = () => {};
+
+    if (isFirebaseAdmin && isAdminMode) {
+      console.log("[SECURITY ENGINE] Elevated user: streaming full reservations (including client PII)...");
+      unsubReservations = onSnapshot(
+        collection(db, "reservations"),
+        (snap) => {
+          const list: Reservation[] = [];
+          snap.forEach((doc) => {
+            list.push({ id: doc.id, ...doc.data() } as Reservation);
+          });
+          setReservations(list);
+          setConnectionError(null);
+        },
+        (err) => {
+          console.error("onSnapshot error in collection 'reservations':", err);
+          setConnectionError({ message: err.message, code: (err as any).code, path: "reservations" });
+          try {
+            handleFirestoreError(err, OperationType.GET, "reservations");
+          } catch (e) {
+            console.warn("Muted error throw inside reservations onSnapshot callback to maintain React rendering context.");
+          }
+        }
+      );
+    } else {
+      console.log("[SECURITY ENGINE] Guest session: streaming zero-PII table availability maps...");
+      unsubReservations = onSnapshot(
+        collection(db, "availability"),
+        (snap) => {
+          const list: any[] = [];
+          snap.forEach((doc) => {
+            const data = doc.data();
+            list.push({
+              id: doc.id,
+              gameId: data.gameId,
+              tableType: data.tableType,
+              tableNumber: data.tableNumber,
+              status: data.status,
+              // Block sensitive names and phone numbers
+              clientName: "Protegido por LGPD",
+              clientPhone: "Oculto"
+            });
+          });
+          setReservations(list);
+          setConnectionError(null);
+        },
+        (err) => {
+          console.error("onSnapshot error in collection 'availability':", err);
+          setConnectionError({ message: err.message, code: (err as any).code, path: "availability" });
+          try {
+            handleFirestoreError(err, OperationType.GET, "availability");
+          } catch (e) {
+            console.warn("Muted error throw inside availability onSnapshot callback.");
+          }
+        }
+      );
+    }
+
+    return () => {
+      unsubReservations();
+    };
+  }, [isAdminMode, isFirebaseAdmin]);
 
   // Quick Seeder function to populate mock games for instant testing
   const handleSeedDemoGames = async () => {
@@ -208,7 +251,12 @@ export default function App() {
       </div>
 
       {/* Navigation Header */}
-      <Header isAdminMode={isAdminMode} onToggleAdminMode={setIsAdminMode} homepageTexts={homepageTexts} />
+      <Header 
+        isAdminMode={isAdminMode} 
+        onToggleAdminMode={setIsAdminMode} 
+        homepageTexts={homepageTexts} 
+        onAdminVerified={setIsFirebaseAdmin}
+      />
 
       {/* Main Core Layout wrapping client space */}
       <main className="relative z-10 flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12 space-y-16">

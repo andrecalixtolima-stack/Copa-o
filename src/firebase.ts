@@ -7,10 +7,26 @@ import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore, doc, getDocFromServer } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
+import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "firebase/app-check";
 import firebaseConfig from "../firebase-applet-config.json";
 
 // Initialize Firebase SDK
 const app = initializeApp(firebaseConfig);
+
+// Initialize App Check dynamically in the browser to guard against bots and scraping
+if (typeof window !== "undefined") {
+  try {
+    // Enable self-signed debug token for development environment
+    (window as any).FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+    initializeAppCheck(app, {
+      provider: new ReCaptchaEnterpriseProvider("6Ld_kcoqAAAAAGWfofB-Hl4pAIn_uS07wshXqen8"),
+      isTokenAutoRefreshEnabled: true
+    });
+    console.log("[SECURITY] Firebase App Check active via ReCaptcha Enterprise.");
+  } catch (appCheckError) {
+    console.warn("[SECURITY] Firebase App Check skipped initialization:", appCheckError);
+  }
+}
 
 // Initialize Firestore database instance
 const customDbId = (firebaseConfig as any).firestoreDatabaseId;
