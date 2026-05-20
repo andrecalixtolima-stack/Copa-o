@@ -22,9 +22,19 @@ interface AdminPanelProps {
   blockedTables: BlockedTable[];
   onRefresh: () => void;
   homepageTexts: HomepageSettings;
+  initialGameToEdit?: Game | null;
+  onClearInitialGameToEdit?: () => void;
 }
 
-export default function AdminPanel({ games, reservations, blockedTables, onRefresh, homepageTexts }: AdminPanelProps) {
+export default function AdminPanel({ 
+  games, 
+  reservations, 
+  blockedTables, 
+  onRefresh, 
+  homepageTexts,
+  initialGameToEdit,
+  onClearInitialGameToEdit
+}: AdminPanelProps) {
   
   const [activeTab, setActiveTab] = useState<"dashboard" | "games" | "reservations" | "blocking" | "texts" | "admins" | "backup">("dashboard");
   const [dashSelectedGameId, setDashSelectedGameId] = useState<string>("");
@@ -105,6 +115,14 @@ export default function AdminPanel({ games, reservations, blockedTables, onRefre
       fetchAdminsAndLogs();
     }
   }, [activeTab]);
+
+  React.useEffect(() => {
+    if (initialGameToEdit) {
+      setActiveTab("games");
+      handleOpenEditForm(initialGameToEdit);
+      onClearInitialGameToEdit?.();
+    }
+  }, [initialGameToEdit, onClearInitialGameToEdit]);
 
   React.useEffect(() => {
     let result = logs;

@@ -6,40 +6,14 @@
 import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
-import { createServer as createViteServer } from "vite";
 import fs from "fs";
 import admin from "firebase-admin";
 import helmet from "helmet";
 import compression from "compression";
+import firebaseConfig from "./firebase-applet-config.json";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-// Load firebase config safely with fs to work perfectly across all environments (Vercel, Cloud Run, Local)
-let firebaseConfig: any = {};
-try {
-  const configPath = path.join(process.cwd(), "firebase-applet-config.json");
-  if (fs.existsSync(configPath)) {
-    firebaseConfig = JSON.parse(fs.readFileSync(configPath, "utf8"));
-  } else {
-    const fallbackPath = path.join(__dirname, "firebase-applet-config.json");
-    if (fs.existsSync(fallbackPath)) {
-      firebaseConfig = JSON.parse(fs.readFileSync(fallbackPath, "utf8"));
-    } else {
-      console.warn("[COPAÇO SERVER] Config file not found at path. Using environment defaults.");
-      firebaseConfig = {
-        projectId: process.env.FIREBASE_PROJECT_ID || "copaco-18b74",
-        firestoreDatabaseId: process.env.FIRESTORE_DATABASE_ID || "ai-studio-398a270b-78a3-408b-9ac9-7aca7526146e"
-      };
-    }
-  }
-} catch (err) {
-  console.error("[COPAÇO SERVER] Exception reading firebase-applet-config.json:", err);
-  firebaseConfig = {
-    projectId: "copaco-18b74",
-    firestoreDatabaseId: "ai-studio-398a270b-78a3-408b-9ac9-7aca7526146e"
-  };
-}
 
 // Initialize Firebase Admin SDK for Cloud Run / Local / Vercel
 if (admin.apps.length === 0) {
@@ -74,7 +48,7 @@ if (admin.apps.length === 0) {
 
 const databaseId = firebaseConfig.firestoreDatabaseId || "(default)";
 const adminDb = databaseId !== "(default)"
-  ? admin.firestore(databaseId)
+  ? (admin as any).firestore(databaseId)
   : admin.firestore();
 const adminAuth = admin.auth();
 
@@ -718,6 +692,7 @@ const PORT = 3000;
   async function startListening() {
     if (process.env.NODE_ENV !== "production" && !process.env.VERCEL) {
       console.log("[COPAÇO SERVER] Initializing Vite Dev Server in dev mode...");
+      const { createServer: createViteServer } = await import("vite");
       const vite = await createViteServer({
         server: { middlewareMode: true },
         appType: "spa",

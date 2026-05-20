@@ -44,6 +44,7 @@ export default function App() {
   const [isAdminMode, setIsAdminMode] = useState(false);
   const [isFirebaseAdmin, setIsFirebaseAdmin] = useState(false);
   const [selectedGame, setSelectedGame] = useState<Game | null>(null);
+  const [gameToEdit, setGameToEdit] = useState<Game | null>(null);
 
   const [seeding, setSeeding] = useState(false);
   const [connectionError, setConnectionError] = useState<{ message: string; code?: string; path?: string } | null>(null);
@@ -461,6 +462,8 @@ export default function App() {
                 blockedTables={blockedTables} 
                 onRefresh={() => {}} 
                 homepageTexts={homepageTexts}
+                initialGameToEdit={gameToEdit}
+                onClearInitialGameToEdit={() => setGameToEdit(null)}
               />
             ) : (
               <MatchList 
@@ -470,8 +473,8 @@ export default function App() {
                 onSelectGame={setSelectedGame} 
                 isAdmin={true} // allow edit actions if authenticated admin clicks
                 onEditGame={(g) => {
+                  setGameToEdit(g);
                   setIsAdminMode(true);
-                  // Optionally pass down game filtering but simply toggling switches tabs nicely
                 }}
               />
             )}
