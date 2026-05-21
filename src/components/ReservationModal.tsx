@@ -321,6 +321,26 @@ export default function ReservationModal({
                 </p>
               </div>
 
+              {/* Banner de Clareza sobre Espaços e Reservas */}
+              <div className="mb-6 bg-[#031c0e] border border-soccer-gold/30 p-4 rounded-2xl text-left">
+                <div className="flex gap-3 items-start">
+                  <div className="bg-soccer-gold/10 p-2 rounded-xl text-soccer-gold h-fit shrink-0 mt-0.5">
+                    <Info className="w-5 h-5" />
+                  </div>
+                  <div className="space-y-1.5 text-xs text-soccer-cream">
+                    <p className="font-bold text-soccer-gold font-display uppercase tracking-wider text-[11px]">
+                      Aviso Importante sobre os Espaços
+                    </p>
+                    <p className="text-white/80 font-sans leading-relaxed">
+                      As <strong className="text-soccer-gold">reservas de mesa são exclusivas para o quintal principal</strong> (onde ficam o telão principal, DJs, sorteios, bolão e atrações especiais).
+                    </p>
+                    <p className="text-soccer-cream/70 font-sans text-[11px] border-t border-soccer-field/30 pt-1.5 mt-1">
+                      💡 Outras áreas da casa possuem TVs de 50 polegadas que funcionam por <strong className="text-white">ordem de chegada</strong> de forma <strong className="text-white">100% gratuita</strong>, sem exigir reserva.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               {formError && (
                 <div className="bg-soccer-neon/10 border border-soccer-neon/40 text-soccer-cream p-4 rounded-xl text-xs flex items-center gap-2 mb-6">
                   <AlertTriangle className="w-4 h-4 text-soccer-neon shrink-0 animate-pulse" />

@@ -114,6 +114,64 @@ export default function MatchList({
         </div>
       </div>
 
+      {/* Guia explicativo de Espaços e Reservas */}
+      <div className="bg-[#031c0e] border border-soccer-gold/30 rounded-3xl p-6 md:p-8 space-y-4 shadow-xl text-left">
+        <div className="flex flex-col lg:flex-row gap-6 items-start justify-between">
+          <div className="space-y-4 flex-1">
+            <span className="text-xs font-mono text-soccer-gold font-bold uppercase tracking-widest bg-soccer-gold/10 px-3 py-1 rounded-full inline-block">
+              📍 Guia de Espaços & Reservas
+            </span>
+            <h3 className="text-xl md:text-2xl font-display font-black text-soccer-cream uppercase leading-snug">
+              Quintal Principal (Área de Reservas)
+            </h3>
+            <p className="text-xs sm:text-sm text-soccer-cream/80 leading-relaxed font-sans">
+              As reservas de mesa no sistema são <strong className="text-soccer-gold">exclusivas para o Quintal Principal</strong>. Este é o setor premium do evento, onde estarão localizados:
+            </p>
+            <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-white/75 font-sans pl-1">
+              <li className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-soccer-gold" />
+                <span>Telão Principal de Alta Definição</span>
+              </li>
+              <li className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-soccer-gold" />
+                <span>Sets de DJs exclusivos no intervalo e pós-jogo</span>
+              </li>
+              <li className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-soccer-gold" />
+                <span>Sorteios presenciais e bolão interativo</span>
+              </li>
+              <li className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-soccer-gold" />
+                <span>Ações com patrocinadores e distribuição de brindes</span>
+              </li>
+            </ul>
+          </div>
+
+          <div className="lg:w-80 w-full bg-black/40 border border-white/5 rounded-2xl p-5 space-y-3 shrink-0">
+            <h4 className="text-[10px] font-mono text-soccer-gold/90 font-bold uppercase tracking-wider block border-b border-white/10 pb-1.5">
+              Outros Ambientes (Acesso de Graça)
+            </h4>
+            <p className="text-xs text-white/80 leading-relaxed font-sans">
+              As demais dependências e varandas do Quinteiro terão mesas e cadeiras com visão para <strong className="text-soccer-gold">TVs de 50 polegadas</strong> de alta qualidade.
+            </p>
+            <div className="space-y-1.5 text-[11px] text-soccer-cream/70 font-mono">
+              <div className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-soccer-orange" />
+                <span>Ordem de chegada livre</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-soccer-orange" />
+                <span>Entrada 100% gratuita</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-soccer-orange" />
+                <span>Não exige reserva de mesa</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {sortedGames.map((game) => {
           const stats = getGameStats(game);

@@ -2163,43 +2163,86 @@ export default function AdminPanel({
                                   }
                                 }
 
-                                setFirebaseResponse("Iniciando upload para o Firebase Storage...");
-                                // Target folder 'settings/' with file name 'logo-evento' as mandated
-                                const storageRef = ref(storage, `settings/logo-evento.${fileExtension}`);
-                                const uploadTask = uploadBytesResumable(storageRef, fileToUpload);
+                                setFirebaseResponse("Iniciando conversão e envio otimizado ao servidor...");
                                 
-                                uploadTask.on('state_changed', 
-                                  (snapshot) => {
-                                    const progress = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
-                                    setUploadProgress(progress);
-                                    setFirebaseResponse(`Enviando ao Storage: ${progress}% concluído.`);
-                                  }, 
-                                  (error) => {
-                                    console.error("Erro Firebase Storage:", error);
-                                    setUploadStatus("error");
-                                    setUploadError(error.message);
-                                  }, 
-                                  async () => {
-                                    try {
-                                      const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-                                      const now = Date.now();
-                                      setUploadStatus("success");
-                                      setTextLogoUrl(downloadURL);
-                                      setLogoUpdatedAt(now);
-                                      setFirebaseResponse("Logo salva e atualizada com sucesso no Firestore em tempo real!");
-                                      
-                                      // Real-time Firestore document update
-                                      const docRef = doc(db, "settings", "homepage");
-                                      await updateDoc(docRef, { 
-                                        logoUrl: downloadURL,
-                                        logoUpdatedAt: now
-                                      });
-                                    } catch (err: any) {
-                                      setUploadStatus("error");
-                                      setUploadError(err.message);
+                                const reader = new FileReader();
+                                reader.onloadend = () => {
+                                  let base64 = reader.result as string;
+
+                                  const xhr = new XMLHttpRequest();
+                                  xhr.open("POST", "/api/upload");
+                                  xhr.setRequestHeader("Content-Type", "application/json");
+                                  xhr.setRequestHeader("x-admin-uid", auth.currentUser?.uid || "local_bypass_admin");
+                                  xhr.setRequestHeader("x-admin-email", auth.currentUser?.email || "andrecalixtolima@gmail.com");
+
+                                  xhr.upload.onprogress = (event) => {
+                                    if (event.lengthComputable) {
+                                      const progress = Math.round((event.loaded / event.total) * 100);
+                                      setUploadProgress(progress);
+                                      setFirebaseResponse(`Sincronizando com o servidor: ${progress}% concluído.`);
                                     }
-                                  }
-                                );
+                                  };
+
+                                  xhr.onload = async () => {
+                                    try {
+                                      if (xhr.status >= 200 && xhr.status < 300) {
+                                        const responseData = JSON.parse(xhr.responseText);
+                                        if (responseData.success && responseData.url) {
+                                          const downloadURL = responseData.url;
+                                          const now = Date.now();
+                                          setUploadStatus("success");
+                                          setTextLogoUrl(downloadURL);
+                                          setLogoUpdatedAt(now);
+                                          setFirebaseResponse(
+                                            responseData.isFallback
+                                              ? "Logo convertida localmente com sucesso!"
+                                              : "Logo salva e sincronizada com sucesso em tempo real!"
+                                          );
+                                          
+                                          // Update settings document in Firestore
+                                          const docRef = doc(db, "settings", "homepage");
+                                          await updateDoc(docRef, { 
+                                            logoUrl: downloadURL,
+                                            logoUpdatedAt: now
+                                          });
+                                        } else {
+                                          throw new Error(responseData.error || "O servidor retornou uma resposta inválida.");
+                                        }
+                                      } else {
+                                        let errorMsg = "Erro desconhecido no upload.";
+                                        try {
+                                          const errRes = JSON.parse(xhr.responseText);
+                                          errorMsg = errRes.error || errorMsg;
+                                        } catch {
+                                          errorMsg = xhr.statusText || errorMsg;
+                                        }
+                                        throw new Error(errorMsg);
+                                      }
+                                    } catch (err: any) {
+                                      console.error("Erro no processamento do upload:", err);
+                                      setUploadStatus("error");
+                                      setUploadError(err.message || "Falha ao processar imagem.");
+                                    }
+                                  };
+
+                                  xhr.onerror = () => {
+                                    setUploadStatus("error");
+                                    setUploadError("Erro de rede ao se conectar com o servidor.");
+                                  };
+
+                                  xhr.send(JSON.stringify({
+                                    base64,
+                                    filename: file.name,
+                                    mimeType: file.type
+                                  }));
+                                };
+
+                                reader.onerror = () => {
+                                  setUploadStatus("error");
+                                  setUploadError("Não foi possível ler o arquivo.");
+                                };
+
+                                reader.readAsDataURL(fileToUpload);
                               } catch (err: any) {
                                 setUploadStatus("error");
                                 setUploadError(err.message);

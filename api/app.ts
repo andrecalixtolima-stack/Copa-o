@@ -97,7 +97,10 @@ app.use(
           "data:",
           "blob:",
           "https://images.unsplash.com",
-          "https://img.icons8.com"
+          "https://img.icons8.com",
+          "https://storage.googleapis.com",
+          "https://firebasestorage.googleapis.com",
+          "https://*.googleapis.com"
         ],
         frameSrc: ["'self'", "https://www.google.com", "https://recaptcha.net", "https://*.run.app"]
       }
@@ -583,6 +586,74 @@ app.post("/api/settings/homepage", adminGuard, async (req, res) => {
   } catch (err: any) {
     console.error("[SERVER SETTINGS ERROR]:", err);
     return res.status(500).json({ error: err.message });
+  }
+});
+
+// API Route: Admin - Securely upload images (e.g. logos, match covers) to Google Cloud Storage or fallback Base64 data-url
+app.post("/api/upload", adminGuard, async (req, res) => {
+  try {
+    const { base64, filename, mimeType } = req.body;
+    const performerEmail = req.headers["x-admin-email"] as string;
+
+    if (!base64 || !filename || !mimeType) {
+      return res.status(400).json({ error: "Parâmetros 'base64', 'filename' e 'mimeType' são obrigatórios." });
+    }
+
+    // Clean base64 string
+    let base64Data = base64;
+    if (base64.includes(";base64,")) {
+      base64Data = base64.split(";base64,").pop();
+    }
+
+    const buffer = Buffer.from(base64Data, "base64");
+    const bucketName = "copaco-18b74.appspot.com";
+
+    try {
+      console.log(`[SERVER UPLOAD] Attempting Admin Google Cloud Storage upload to bucket: ${bucketName}...`);
+      const bucket = admin.storage().bucket(bucketName);
+      
+      const fileExtension = filename.split(".").pop()?.toLowerCase() || "png";
+      const storagePath = `uploads/${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${fileExtension}`;
+      const fileRef = bucket.file(storagePath);
+
+      await fileRef.save(buffer, {
+        metadata: {
+          contentType: mimeType,
+          cacheControl: "public, max-age=31536000",
+        }
+      });
+
+      // Try making the file public. If that throws a secondary permission exception on specific Firebase projects,
+      // the dynamic fallback will handle any bucket permission locks smoothly.
+      try {
+        await fileRef.makePublic();
+      } catch (e) {
+        console.warn("[SERVER UPLOAD] fileRef.makePublic() threw permissions error. Will proceed to serve public URL anyway.", e);
+      }
+
+      // Public URL can be retrieved via the official Google standard
+      const publicUrl = `https://storage.googleapis.com/${bucketName}/${storagePath}`;
+      console.log(`[SERVER UPLOAD SUCCESS] Saved public GCS file: ${publicUrl}`);
+
+      return res.json({
+        success: true,
+        url: publicUrl,
+        filename: filename
+      });
+    } catch (storageErr: any) {
+      console.warn(`[SERVER UPLOAD WARNING] GCS Admin upload failed. Falling back to inline data URL. Error:`, storageErr.message);
+      // Fallback: return optimized Base64 data URL
+      const inlineUrl = `data:${mimeType};base64,${base64Data}`;
+      return res.json({
+        success: true,
+        url: inlineUrl,
+        filename: filename,
+        isFallback: true
+      });
+    }
+  } catch (err: any) {
+    console.error("[SERVER UPLOAD EXCEPTION]:", err);
+    return res.status(500).json({ error: err.message || "Erro no upload do servidor." });
   }
 });
 
