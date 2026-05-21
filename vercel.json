@@ -2,6 +2,10 @@
   "version": 2,
   "rewrites": [
     {
+      "source": "/api/reservations/create",
+      "destination": "/api/reservations/create"
+    },
+    {
       "source": "/api/:path*",
       "destination": "/api/index"
     },

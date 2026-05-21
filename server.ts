@@ -7,67 +7,9 @@ import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
 import fs from "fs";
-import admin from "firebase-admin";
-import { getFirestore } from "firebase-admin/firestore";
 import helmet from "helmet";
 import compression from "compression";
-import firebaseConfig from "./firebase-applet-config.json";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// Initialize Firebase Admin SDK for Cloud Run / Local / Vercel
-// Initialize Firebase Admin SDK for Cloud Run / Local / Vercel
-const ambientProjectId = process.env.GOOGLE_CLOUD_PROJECT || process.env.GCP_PROJECT;
-const finalProjectId = ambientProjectId && !process.env.FIREBASE_SERVICE_ACCOUNT && !(process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL)
-  ? ambientProjectId
-  : firebaseConfig.projectId;
-
-console.log(`[COPAÇO SERVER] Environment Project ID: ${ambientProjectId || "None found"}. Config Project ID: ${firebaseConfig.projectId}. Initializing Firebase Admin SDK with Project ID: ${finalProjectId}`);
-
-if (admin.apps.length === 0) {
-  try {
-    if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-      const sa = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-      admin.initializeApp({
-        credential: admin.credential.cert(sa),
-        projectId: finalProjectId
-      });
-      console.log("[COPAÇO SERVER] Firebase Admin SDK initialized with Service Account.");
-    } else if (process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL) {
-      admin.initializeApp({
-        credential: admin.credential.cert({
-          projectId: finalProjectId,
-          clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-          privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n")
-        }),
-        projectId: finalProjectId
-      });
-      console.log("[COPAÇO SERVER] Firebase Admin SDK initialized with Private Key credentials.");
-    } else {
-      admin.initializeApp({
-        projectId: finalProjectId
-      });
-      console.log("[COPAÇO SERVER] Firebase Admin SDK initialized with ambient credentials.");
-    }
-  } catch (error) {
-    console.warn("[COPAÇO SERVER] Firebase Admin SDK initialization fallback warning:", error);
-  }
-}
-
-const databaseId = firebaseConfig.firestoreDatabaseId || "(default)";
-let adminDb: any;
-try {
-  const appInstance = admin.apps.length > 0 ? admin.apps[0] : undefined;
-  adminDb = databaseId !== "(default)"
-    ? getFirestore(appInstance as any, databaseId)
-    : getFirestore(appInstance as any);
-  console.log(`[COPAÇO SERVER] Connected to Firestore database ID: ${databaseId}`);
-} catch (error) {
-  console.error("[COPAÇO SERVER] Failed to initialize Firestore with databaseId, falling back to default:", error);
-  adminDb = admin.firestore();
-}
-const adminAuth = admin.auth();
+import { admin, adminDb, adminAuth, firebaseConfig } from "./api/lib/firebaseAdmin";
 
 // Secure In-Memory Rate Limiting Engine
 interface RateLimitData {
@@ -802,69 +744,71 @@ const PORT = 3000;
 
   // Background Automation: Self-cleaning loop for expired free reservations (1 hour before match time)
   // Completely migrated to Admin DB to eliminate any possible permission lock issues
-  setInterval(async () => {
-    try {
-      const now = new Date();
-      const cutoffTime = new Date(now.getTime() + 60 * 60 * 1000); // 1 hour from now
+  if (!process.env.VERCEL) {
+    setInterval(async () => {
+      try {
+        const now = new Date();
+        const cutoffTime = new Date(now.getTime() + 60 * 60 * 1000); // 1 hour from now
 
-      // Fetch active allocations from public availability
-      const querySnapshot = await adminDb.collection("availability")
-        .where("status", "in", ["aguardando comprovante", "confirmado", "ativa"])
-        .get();
+        // Fetch active allocations from public availability
+        const querySnapshot = await adminDb.collection("availability")
+          .where("status", "in", ["aguardando comprovante", "confirmado", "ativa"])
+          .get();
 
-      let expiredCount = 0;
+        let expiredCount = 0;
 
-      for (const d of querySnapshot.docs) {
-        const availData = d.data();
-        if (availData.reservationId) {
-          // Fetch the individual reservation doc (runs transparently bypasses rules on adminDb)
-          const resSnap = await adminDb.collection("reservations").doc(availData.reservationId).get();
-          
-          if (resSnap.exists) {
-            const data = resSnap.data()!;
-            // Verify if the reservation meets expiration conditions (only free games with status awaiting/confirmed/active closer to match hour)
-            if (data.isBrazilGame === false && data.gameDateTime) {
-              const gameTime = new Date(data.gameDateTime);
-              if (gameTime <= cutoffTime) {
-                const resId = availData.reservationId;
-                
-                // Perform the status-only change
-                await adminDb.collection("reservations").doc(resId).update({
-                  status: "liberada automaticamente",
-                  updatedAt: new Date().toISOString()
-                });
+        for (const d of querySnapshot.docs) {
+          const availData = d.data();
+          if (availData.reservationId) {
+            // Fetch the individual reservation doc (runs transparently bypasses rules on adminDb)
+            const resSnap = await adminDb.collection("reservations").doc(availData.reservationId).get();
+            
+            if (resSnap.exists) {
+              const data = resSnap.data()!;
+              // Verify if the reservation meets expiration conditions (only free games with status awaiting/confirmed/active closer to match hour)
+              if (data.isBrazilGame === false && data.gameDateTime) {
+                const gameTime = new Date(data.gameDateTime);
+                if (gameTime <= cutoffTime) {
+                  const resId = availData.reservationId;
+                  
+                  // Perform the status-only change
+                  await adminDb.collection("reservations").doc(resId).update({
+                    status: "liberada automaticamente",
+                    updatedAt: new Date().toISOString()
+                  });
 
-                // Clear/remove live table maps allocation
-                if (data.gameId && data.tableType && data.tableNumber) {
-                  const availabilityId = `${data.gameId}_${data.tableType}_${data.tableNumber}`;
-                  await adminDb.collection("availability").doc(availabilityId).delete().catch(() => {});
+                  // Clear/remove live table maps allocation
+                  if (data.gameId && data.tableType && data.tableNumber) {
+                    const availabilityId = `${data.gameId}_${data.tableType}_${data.tableNumber}`;
+                    await adminDb.collection("availability").doc(availabilityId).delete().catch(() => {});
+                  }
+
+                  // Log this auto-release
+                  const logId = adminDb.collection("auditLogs").doc().id;
+                  await adminDb.collection("auditLogs").doc(logId).set({
+                    id: logId,
+                    action: "auto_release",
+                    details: `Mesa #${data.tableNumber} (${data.tableType}) liberada expirada para o jogo ${data.gameName}.`,
+                    performedBy: "SYSTEM_AUTOMATION",
+                    performedByEmail: "system@copaco.com",
+                    timestamp: new Date().toISOString()
+                  });
+
+                  expiredCount++;
                 }
-
-                // Log this auto-release
-                const logId = adminDb.collection("auditLogs").doc().id;
-                await adminDb.collection("auditLogs").doc(logId).set({
-                  id: logId,
-                  action: "auto_release",
-                  details: `Mesa #${data.tableNumber} (${data.tableType}) liberada expirada para o jogo ${data.gameName}.`,
-                  performedBy: "SYSTEM_AUTOMATION",
-                  performedByEmail: "system@copaco.com",
-                  timestamp: new Date().toISOString()
-                });
-
-                expiredCount++;
               }
             }
           }
         }
-      }
 
-      if (expiredCount > 0) {
-        console.log(`[AUTOMATION] Automatically released ${expiredCount} expired free table reservations.`);
+        if (expiredCount > 0) {
+          console.log(`[AUTOMATION] Automatically released ${expiredCount} expired free table reservations.`);
+        }
+      } catch (e) {
+        console.error("[AUTOMATION ERROR] Failed to run auto-expiration loop using admin SDK:", e);
       }
-    } catch (e) {
-      console.error("[AUTOMATION ERROR] Failed to run auto-expiration loop using admin SDK:", e);
-    }
-  }, 35000); // Check every 35 seconds
+    }, 35000); // Check every 35 seconds
+  }
 
   // Asynchronously configure dev server & start listening
   async function startListening() {
