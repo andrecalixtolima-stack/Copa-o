@@ -4,7 +4,7 @@
  */
 
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { adminDb } from "../lib/firebaseAdmin";
+import { adminDb } from "../lib/firebaseAdmin.js";
 
 // Simple in-memory rate limiter per serverless container instance
 interface RateLimitData {

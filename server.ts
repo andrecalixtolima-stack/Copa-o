@@ -5,8 +5,8 @@
 
 import path from "path";
 import express from "express";
-import { app } from "./api/app";
-import { adminDb } from "./api/lib/firebaseAdmin";
+import { app } from "./api/app.js";
+import { adminDb } from "./api/lib/firebaseAdmin.js";
 
 const PORT = 3000;
 

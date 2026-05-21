@@ -6,7 +6,7 @@
 import express from "express";
 import helmet from "helmet";
 import compression from "compression";
-import { admin, adminDb, adminAuth } from "./lib/firebaseAdmin";
+import { admin, adminDb, adminAuth } from "./lib/firebaseAdmin.js";
 
 // Secure In-Memory Rate Limiting Engine for Serverless
 interface RateLimitData {
