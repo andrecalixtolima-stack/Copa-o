@@ -34,8 +34,8 @@ const LogoImage = React.memo(function LogoImage({
     const rawDirectUrl = getDirectImageUrl(logoUrl);
     if (!rawDirectUrl) return "";
     
-    // Only append version query parameter if logoUpdatedAt is available
-    if (logoUpdatedAt) {
+    // Only append version query parameter if logoUpdatedAt is available and it is not a base64 Data URL
+    if (logoUpdatedAt && !rawDirectUrl.startsWith("data:image/")) {
       return rawDirectUrl.includes("?") 
         ? `${rawDirectUrl}&t=${logoUpdatedAt}` 
         : `${rawDirectUrl}?t=${logoUpdatedAt}`;

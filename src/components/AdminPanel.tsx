@@ -2092,12 +2092,9 @@ export default function AdminPanel({
                                   throw new Error("Formato não permitido! Selecione uma imagem .png, .jpg, .jpeg, .webp, ou .svg");
                                 }
 
-                                if (file.size > 5 * 1024 * 1024) {
-                                  throw new Error("A imagem é muito grande! Escolha um arquivo de no máximo 5MB.");
-                                }
-
-                                // Store user-selected filename and raw format dimensions
-                                const originalSizeFormatted = (file.size / 1024).toFixed(1) + " KB";
+                                const originalSizeInKb = file.size / 1024;
+                                const originalSizeFormatted = originalSizeInKb.toFixed(1) + " KB";
+                                
                                 setUploadedFileInfo({
                                   name: file.name,
                                   size: originalSizeFormatted
@@ -2105,65 +2102,92 @@ export default function AdminPanel({
 
                                 let fileToUpload: File | Blob = file;
 
-                                // Compress JPEGs/PNGs client-side using a Canvas helper to save load time & bandwidth
+                                // Compress JPEGs/PNGs/WEBP client-side using an iterative multi-pass Canvas helper to strictly stay under 320KB
                                 if (fileExtension !== "svg" && file.type !== "image/svg+xml") {
-                                  setFirebaseResponse("Otimizando dimensões para carregamento instantâneo...");
+                                  setFirebaseResponse("Otimizando dimensões e compactando imagem...");
                                   try {
-                                    fileToUpload = await new Promise<File | Blob>((resolve) => {
-                                      const reader = new FileReader();
-                                      reader.onload = (event) => {
-                                        const img = new Image();
-                                        img.onload = () => {
+                                    fileToUpload = await new Promise<File | Blob>((resolve, reject) => {
+                                      const img = new Image();
+                                      const objectUrl = URL.createObjectURL(file);
+                                      
+                                      img.onload = () => {
+                                        URL.revokeObjectURL(objectUrl);
+                                        
+                                        // Multi-pass size reduction targeting < 320 KB for safe database storage 
+                                        let scale = 1.0;
+                                        let quality = 0.85;
+                                        const originalWidth = img.width;
+                                        const originalHeight = img.height;
+                                        
+                                        // Max initial dimension of 600px is perfect for app headers/logos
+                                        const maxDim = 600;
+                                        if (originalWidth > maxDim || originalHeight > maxDim) {
+                                          scale = Math.min(maxDim / originalWidth, maxDim / originalHeight);
+                                        }
+
+                                        const attemptCompression = () => {
                                           const canvas = document.createElement("canvas");
-                                          let width = img.width;
-                                          let height = img.height;
-                                          
-                                          const MAX_BOUND = 1000;
-                                          if (width > MAX_BOUND || height > MAX_BOUND) {
-                                            if (width > height) {
-                                              height = Math.round((height * MAX_BOUND) / width);
-                                              width = MAX_BOUND;
-                                            } else {
-                                              width = Math.round((width * MAX_BOUND) / height);
-                                              height = MAX_BOUND;
-                                            }
-                                          }
-                                          
-                                          canvas.width = width;
-                                          canvas.height = height;
                                           const ctx = canvas.getContext("2d");
-                                          if (ctx) {
-                                            ctx.drawImage(img, 0, 0, width, height);
-                                            const outputType = file.type === "image/png" ? "image/png" : "image/jpeg";
-                                            canvas.toBlob((blob) => {
-                                              if (blob) {
-                                                const compressedFile = new File([blob], file.name, { type: outputType });
-                                                // Update info with optimized weight
-                                                setUploadedFileInfo({
-                                                  name: file.name,
-                                                  size: `${originalSizeFormatted} (Oposto: ${(blob.size / 1024).toFixed(1)} KB)`
-                                                });
-                                                resolve(compressedFile);
-                                              } else {
-                                                resolve(file);
-                                              }
-                                            }, outputType, 0.85);
-                                          } else {
+                                          if (!ctx) {
                                             resolve(file);
+                                            return;
                                           }
+
+                                          canvas.width = Math.max(1, Math.round(originalWidth * scale));
+                                          canvas.height = Math.max(1, Math.round(originalHeight * scale));
+
+                                          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+                                          const isPng = file.type === "image/png" || fileExtension === "png";
+                                          const mimeType = isPng ? "image/png" : "image/jpeg";
+
+                                          canvas.toBlob((blob) => {
+                                            if (!blob) {
+                                              resolve(file);
+                                              return;
+                                            }
+
+                                            // If PNG is still too big, scale down dimensions. If JPEG is too big, reduce dimensions and quality.
+                                            if (blob.size > 320 * 1024 && (scale > 0.3 || quality > 0.40)) {
+                                              if (isPng) {
+                                                scale *= 0.75;
+                                              } else {
+                                                scale *= 0.82;
+                                                quality -= 0.12;
+                                              }
+                                              attemptCompression();
+                                            } else {
+                                              const compressed = new File([blob], file.name, { type: mimeType });
+                                              setUploadedFileInfo({
+                                                name: file.name,
+                                                size: `${originalSizeFormatted} (Otimizado: ${(blob.size / 1024).toFixed(1)} KB)`
+                                              });
+                                              resolve(compressed);
+                                            }
+                                          }, mimeType, isPng ? undefined : quality);
                                         };
-                                        img.onerror = () => resolve(file);
-                                        img.src = event.target?.result as string;
+
+                                        attemptCompression();
                                       };
-                                      reader.onerror = () => resolve(file);
-                                      reader.readAsDataURL(file);
+
+                                      img.onerror = () => {
+                                        URL.revokeObjectURL(objectUrl);
+                                        reject(new Error("Não foi possível carregar a imagem selecionada."));
+                                      };
+
+                                      img.src = objectUrl;
                                     });
                                   } catch (err) {
-                                    console.warn("Falha na compressão automática, usando arquivo original:", err);
+                                    console.warn("Falha na compactação automática, usando arquivo original:", err);
+                                  }
+                                } else {
+                                  // For SVG vector files, verify size directly
+                                  if (file.size > 320 * 1024) {
+                                    throw new Error("Arquivo SVG muito grande! Por favor, utilize um arquivo SVG simplificado de no máximo 320 KB.");
                                   }
                                 }
 
-                                setFirebaseResponse("Iniciando conversão e envio otimizado ao servidor...");
+                                setFirebaseResponse("Sincronizando imagem de forma otimizada...");
                                 
                                 const reader = new FileReader();
                                 reader.onloadend = () => {
@@ -2179,7 +2203,7 @@ export default function AdminPanel({
                                     if (event.lengthComputable) {
                                       const progress = Math.round((event.loaded / event.total) * 100);
                                       setUploadProgress(progress);
-                                      setFirebaseResponse(`Sincronizando com o servidor: ${progress}% concluído.`);
+                                      setFirebaseResponse("Carregando...");
                                     }
                                   };
 
@@ -2193,11 +2217,7 @@ export default function AdminPanel({
                                           setUploadStatus("success");
                                           setTextLogoUrl(downloadURL);
                                           setLogoUpdatedAt(now);
-                                          setFirebaseResponse(
-                                            responseData.isFallback
-                                              ? "Logo convertida localmente com sucesso!"
-                                              : "Logo salva e sincronizada com sucesso em tempo real!"
-                                          );
+                                          setFirebaseResponse("Logo carregada com sucesso");
                                           
                                           // Update settings document in Firestore
                                           const docRef = doc(db, "settings", "homepage");
@@ -2209,7 +2229,7 @@ export default function AdminPanel({
                                           throw new Error(responseData.error || "O servidor retornou uma resposta inválida.");
                                         }
                                       } else {
-                                        let errorMsg = "Erro desconhecido no upload.";
+                                        let errorMsg = "Erro no carregamento.";
                                         try {
                                           const errRes = JSON.parse(xhr.responseText);
                                           errorMsg = errRes.error || errorMsg;
@@ -2227,7 +2247,7 @@ export default function AdminPanel({
 
                                   xhr.onerror = () => {
                                     setUploadStatus("error");
-                                    setUploadError("Erro de rede ao se conectar com o servidor.");
+                                    setUploadError("Erro de comunicação ao se conectar com o servidor.");
                                   };
 
                                   xhr.send(JSON.stringify({
@@ -2271,9 +2291,8 @@ export default function AdminPanel({
                             setUploadStatus("idle");
                             setUploadError("");
                             setUploadedFileInfo(null);
-                            setFirebaseResponse("Logotipo removido.");
+                            setFirebaseResponse("");
                             try {
-                              // Real-time Firestore document wipe
                               const docRef = doc(db, "settings", "homepage");
                               await updateDoc(docRef, { 
                                 logoUrl: "",
@@ -2325,15 +2344,15 @@ export default function AdminPanel({
                     </div>
                   </div>
 
-                  {/* MONITOR DE LOGOTIPO & FIREBASE STORAGE */}
+                  {/* PREVIEW RESPONSIVO E STATUS DE LOGOTIPO */}
                   {(uploadStatus !== "idle" || textLogoUrl) && (
-                    <div className="mt-4 p-4 rounded-xl bg-[#03140a] border border-soccer-field/30 space-y-2.5 text-left">
+                    <div className="mt-4 p-4 rounded-xl bg-[#03140a] border border-soccer-field/30 space-y-3 text-left">
                       <div className="flex items-center justify-between border-b border-soccer-field/20 pb-1.5">
                         <span className="text-soccer-gold font-sans font-bold uppercase text-[10px] tracking-wider">📦 Status do Logotipo</span>
                         <span className="text-[9px] font-mono text-soccer-cream/50">Auto-sincronizado</span>
                       </div>
 
-                      <div className="space-y-2 text-xs text-soccer-cream">
+                      <div className="space-y-3 text-xs text-soccer-cream">
                         {/* File Details: Name & Size */}
                         {uploadedFileInfo && (
                           <div className="text-[11px] bg-[#020e06] border border-soccer-field/15 p-2 rounded-lg text-soccer-cream/90 flex flex-col gap-0.5 font-mono">
@@ -2345,7 +2364,7 @@ export default function AdminPanel({
                         {uploadStatus === "uploading" && (
                           <div className="space-y-1.5">
                             <div className="flex justify-between items-center text-[10px]">
-                              <span className="text-amber-400 font-bold animate-pulse">Enviando imagem otimizada...</span>
+                              <span className="text-amber-400 font-bold animate-pulse">{firebaseResponse || "Processando..."}</span>
                               <span className="font-mono">{uploadProgress}%</span>
                             </div>
                             <div className="w-full bg-[#020e06] rounded-full h-1 overflow-hidden">
@@ -2358,9 +2377,9 @@ export default function AdminPanel({
                           <div className="p-2.5 rounded-lg bg-emerald-950/40 border border-emerald-500/30 text-emerald-300 text-[11px] leading-relaxed">
                             <span className="font-bold flex items-center gap-1.5 text-emerald-400 mb-0.5">
                               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping inline-block" />
-                              ✨ Logo atualizada com sucesso!
+                              ✨ Logo carregada com sucesso
                             </span>
-                            Salvo e atualizado automaticamente no Firestore em tempo real. Os visitantes já veem a nova logo.
+                            O logotipo oficial foi salvo de forma otimizada para carregamento instantâneo.
                           </div>
                         )}
 
@@ -2372,16 +2391,35 @@ export default function AdminPanel({
                         )}
 
                         {textLogoUrl && (
-                          <div className="text-[10px] font-mono bg-[#020e06] border border-soccer-field/15 p-2 rounded break-all text-soccer-cream/80 space-y-1">
-                            <span className="text-soccer-gold font-sans font-bold uppercase text-[8px] tracking-wider block">URL Ativa da Imagem (Firestore):</span>
-                            <span className="select-all block text-zinc-300">{textLogoUrl}</span>
+                          <div className="space-y-2 border-t border-soccer-field/20 pt-2 bg-black/20 p-2 rounded-lg">
+                            <span className="text-soccer-gold font-sans font-bold uppercase text-[9px] tracking-wider block">Visualização Responsiva (Header, Médio, Hero)</span>
+                            <div className="flex flex-wrap gap-4 items-end justify-start">
+                              <div className="flex flex-col items-center gap-1">
+                                <div className="w-10 h-10 rounded-lg bg-[#020e06] border border-soccer-field/30 flex items-center justify-center p-1 overflow-hidden shrink-0 shadow-inner">
+                                  <LogoImage logoUrl={textLogoUrl} logoUpdatedAt={logoUpdatedAt} alt="Prev 1" className="w-full h-full object-contain" fallbackType="header" />
+                                </div>
+                                <span className="text-[8px] font-mono text-soccer-cream/40">Topo (40px)</span>
+                              </div>
+                              <div className="flex flex-col items-center gap-1">
+                                <div className="w-16 h-16 rounded-xl bg-[#020e06] border border-soccer-field/30 flex items-center justify-center p-1.5 overflow-hidden shrink-0 shadow-inner">
+                                  <LogoImage logoUrl={textLogoUrl} logoUpdatedAt={logoUpdatedAt} alt="Prev 2" className="w-full h-full object-contain" fallbackType="admin" />
+                                </div>
+                                <span className="text-[8px] font-mono text-soccer-cream/40">Médio (64px)</span>
+                              </div>
+                              <div className="flex flex-col items-center gap-1">
+                                <div className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#020e06] to-black border border-soccer-field/30 flex items-center justify-center min-w-[100px] h-10 overflow-hidden shrink-0 shadow-inner">
+                                  <LogoImage logoUrl={textLogoUrl} logoUpdatedAt={logoUpdatedAt} alt="Prev 3" className="max-h-7 max-w-[80px] object-contain" fallbackType="hero" />
+                                </div>
+                                <span className="text-[8px] font-mono text-soccer-cream/40">Destacado (h-40)</span>
+                              </div>
+                            </div>
                           </div>
                         )}
                       </div>
                     </div>
                   )}
 
-                  <p className="text-[10px] text-soccer-cream/45 font-mono leading-tight">Formatos permitidos: .PNG, .JPG, .JPEG, .WEBP, .SVG. Imagens enviadas são carregadas no Firebase Storage; links manuais devem referenciar o arquivo de imagem diretamente.</p>
+                  <p className="text-[10px] text-soccer-cream/45 font-mono leading-tight">Formatos recomendados: .PNG, .JPG, .JPEG, .WEBP, .SVG. Imagens são comprimidas automaticamente antes do envio.</p>
                 </div>
               </div>
             </div>
