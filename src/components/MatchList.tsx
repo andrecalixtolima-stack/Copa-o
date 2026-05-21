@@ -115,19 +115,19 @@ export default function MatchList({
       </div>
 
       {/* Guia explicativo de Espaços e Reservas */}
-      <div className="bg-white border border-soccer-field rounded-3xl p-6 md:p-8 space-y-4 shadow-md text-left">
+      <div className="bg-black/40 border border-white/5 rounded-3xl p-6 md:p-8 space-y-4 text-left">
         <div className="flex flex-col lg:flex-row gap-6 items-start justify-between">
           <div className="space-y-4 flex-1">
             <span className="text-xs font-mono text-soccer-gold font-bold uppercase tracking-widest bg-soccer-gold/10 px-3 py-1 rounded-full inline-block">
               📍 Guia de Espaços & Reservas
             </span>
-            <h3 className="text-xl md:text-2xl font-display font-black text-soccer-dark uppercase leading-snug">
+            <h3 className="text-xl md:text-2xl font-display font-black text-soccer-cream uppercase leading-snug">
               Quintal Principal (Área de Reservas)
             </h3>
-            <p className="text-xs sm:text-sm text-soccer-dark/80 leading-relaxed font-sans">
-              As reservas de mesa no sistema são <strong className="text-soccer-gold">exclusivas para o Quintal Principal</strong>. Este é o setor premium do evento, onde estarão localizados:
+            <p className="text-xs sm:text-sm text-soccer-cream/80 leading-relaxed font-sans">
+              As reservas de mesa no sistema são <strong className="text-soccer-gold">exclusivas para o Quintal Principal</strong>. Este é o sector premium do evento, onde estarão localizados:
             </p>
-            <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-soccer-dark/95 font-sans pl-1">
+            <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-soccer-cream/95 font-sans pl-1">
               <li className="flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-soccer-gold" />
                 <span>Telão Principal de Alta Definição</span>
@@ -147,14 +147,14 @@ export default function MatchList({
             </ul>
           </div>
 
-          <div className="lg:w-80 w-full bg-[#e8f2eb] border border-soccer-field rounded-2xl p-5 space-y-3 shrink-0">
-            <h4 className="text-[10px] font-mono text-soccer-gold font-bold uppercase tracking-wider block border-b border-soccer-field pb-1.5">
+          <div className="lg:w-80 w-full bg-soccer-field/15 border border-white/5 rounded-2xl p-5 space-y-3 shrink-0">
+            <h4 className="text-[10px] font-mono text-soccer-gold font-bold uppercase tracking-wider block border-b border-white/5 pb-1.5">
               Outros Ambientes (Acesso de Graça)
             </h4>
-            <p className="text-xs text-soccer-dark/90 leading-relaxed font-sans">
+            <p className="text-xs text-soccer-cream/90 leading-relaxed font-sans">
               As demais dependências e varandas do Quinteiro terão mesas e cadeiras com visão para <strong className="text-[#0c5927]">TVs de 50 polegadas</strong> de alta qualidade.
             </p>
-            <div className="space-y-1.5 text-[11px] text-soccer-dark/80 font-mono">
+            <div className="space-y-1.5 text-[11px] text-soccer-cream/80 font-mono">
               <div className="flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-soccer-orange" />
                 <span>Ordem de chegada livre</span>
@@ -191,8 +191,8 @@ export default function MatchList({
               <div
                 className={`relative rounded-3xl overflow-hidden backdrop-blur-md transition-all duration-500 hover:-translate-y-1 h-full flex flex-col ${
                   isBrazil 
-                    ? "bg-[#eaf5ed] border-2 border-soccer-gold" 
-                    : "bg-white border border-soccer-field hover:shadow-lg hover:border-soccer-gold/40 shadow-sm"
+                    ? "bg-[#052912]/80 border-2 border-soccer-gold/80" 
+                    : "bg-black/40 border border-white/5 hover:border-soccer-gold/30"
                 }`}
               >
                 {/* Badge Jogo do Brasil */}
@@ -205,18 +205,18 @@ export default function MatchList({
 
                 {/* Status Ribbon: ESGOTADO */}
                 {stats.isSoldOut && (
-                  <div className="absolute inset-0 z-20 bg-white/90 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center">
+                  <div className="absolute inset-0 z-20 bg-black/90 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center">
                     <div className="bg-soccer-neon text-white text-sm font-display font-black uppercase tracking-widest px-6 py-2 rounded-xl shadow-lg border border-soccer-neon/40 rotate-[-4deg]">
                       ESGOTADO
                     </div>
-                    <p className="text-soccer-dark/85 text-xs mt-3 font-mono">
+                    <p className="text-soccer-cream/85 text-xs mt-3 font-mono">
                       Todos os lugares reservados com transmissão ao vivo garantida.
                     </p>
                     {isAdmin && onEditGame && (
                       <button
                         id={`edit_game_soldout_btn_${game.id}`}
                         onClick={() => onEditGame(game)}
-                        className="mt-4 flex items-center gap-1 px-4 py-2 bg-soccer-field hover:bg-soccer-field/80 text-soccer-gold font-mono text-xs rounded-lg transition-transform"
+                        className="mt-4 flex items-center gap-1 px-4 py-2 bg-soccer-field/30 hover:bg-soccer-field/50 text-soccer-gold font-mono text-xs rounded-lg transition-transform"
                       >
                         <Edit2 className="w-3.5 h-3.5" />
                         Painel do Jogo
@@ -228,7 +228,7 @@ export default function MatchList({
               <div className="flex flex-col sm:flex-row h-full">
                 
                 {/* Visual Banner Left */}
-                <div className="sm:w-2/5 relative h-48 sm:h-auto overflow-hidden bg-[#e8f0ea]">
+                <div className="sm:w-2/5 relative h-48 sm:h-auto overflow-hidden bg-soccer-field/15">
                   {game.imageUrl ? (
                     <img 
                       src={game.imageUrl} 
@@ -238,18 +238,18 @@ export default function MatchList({
                     />
                   ) : (
                     /* Elegant Custom Themed Soccer Abstract Placeholder */
-                    <div className="w-full h-full bg-gradient-to-br from-[#d7ebde] via-[#f4faf6] to-[#ecfaf1] flex flex-col items-center justify-center p-4 relative">
-                      <div className="absolute inset-0 opacity-[0.06] bg-[radial-gradient(#ca8a04_1px,transparent_1px)] [background-size:16px_16px]" />
+                    <div className="w-full h-full bg-gradient-to-br from-[#021f0a] via-[#041004] to-[#01240c] flex flex-col items-center justify-center p-4 relative">
+                      <div className="absolute inset-0 opacity-[0.06] bg-[radial-gradient(#eab308_1px,transparent_1px)] [background-size:16px_16px]" />
                       
                       <div className="flex items-center gap-2 mb-3 z-10 w-full justify-around">
                         <div className="flex flex-col items-center">
-                          <div className="w-12 h-12 bg-[#092c15] border border-soccer-field rounded-full flex items-center justify-center font-display font-black text-soccer-gold text-lg shadow-md uppercase">
+                          <div className="w-12 h-12 bg-black/60 border border-white/10 rounded-full flex items-center justify-center font-display font-black text-soccer-gold text-lg shadow-md uppercase">
                             {(game.homeTeam || "").substring(0, 2)}
                           </div>
                         </div>
-                        <div className="text-soccer-dark/40 font-mono text-[10px] uppercase font-bold">X</div>
+                        <div className="text-soccer-cream/40 font-mono text-[10px] uppercase font-bold">X</div>
                         <div className="flex flex-col items-center">
-                          <div className="w-12 h-12 bg-[#092c15] border border-soccer-field rounded-full flex items-center justify-center font-display font-black text-soccer-gold text-lg shadow-md uppercase">
+                          <div className="w-12 h-12 bg-black/60 border border-white/10 rounded-full flex items-center justify-center font-display font-black text-soccer-gold text-lg shadow-md uppercase">
                             {(game.awayTeam || "").substring(0, 2)}
                           </div>
                         </div>
@@ -259,7 +259,7 @@ export default function MatchList({
                         <span className="text-[10px] font-mono text-soccer-gold tracking-widest uppercase block mb-1">
                           COPA DO MUNDO
                         </span>
-                        <span className="text-xs text-soccer-dark font-semibold font-display truncate max-w-[150px] block">
+                        <span className="text-xs text-white font-semibold font-display truncate max-w-[150px] block">
                           Quinteiro Arena
                         </span>
                       </div>
@@ -276,31 +276,31 @@ export default function MatchList({
                     {/* Date Details */}
                     <div className="flex items-center gap-4 text-xs font-mono text-soccer-gold/90 mb-2.5">
                       <div className="flex items-center gap-1">
-                        <Calendar className="w-3.5 h-3.5 text-[#0c5927]" />
-                        <span className="uppercase text-[11px] font-bold tracking-tight text-soccer-dark/90">
+                        <Calendar className="w-3.5 h-3.5 text-soccer-gold" />
+                        <span className="uppercase text-[11px] font-bold tracking-tight text-soccer-cream/90">
                           {formatMatchDate(game.dateTime)}
                         </span>
                       </div>
                       <div className="flex items-center gap-1">
                         <Clock className="w-3.5 h-3.5 text-soccer-orange" />
-                        <span className="font-bold text-soccer-dark/95">{formatMatchTime(game.dateTime)}</span>
+                        <span className="font-bold text-soccer-cream">{formatMatchTime(game.dateTime)}</span>
                       </div>
                     </div>
 
                     {/* Team Matchup Title */}
-                    <h3 className="text-2xl font-display font-extrabold tracking-tight text-soccer-dark leading-tight mb-2 group-hover:text-soccer-gold transition-colors">
+                    <h3 className="text-2xl font-display font-extrabold tracking-tight text-soccer-cream leading-tight mb-2 group-hover:text-soccer-gold transition-colors">
                       {game.homeTeam} <span className="text-soccer-gold font-sans font-light">vs</span> {game.awayTeam}
                     </h3>
 
                     {/* Game short description */}
-                    <p className="text-xs text-soccer-dark/80 line-clamp-2 leading-relaxed mb-4">
+                    <p className="text-xs text-soccer-cream/70 line-clamp-2 leading-relaxed mb-4">
                       {game.description || "A maior emoção da Copa do Mundo com áudio original do estádio, gastronomia e cerveja estupidamente gelada."}
                     </p>
 
                     {/* Performance/Show details */}
                     <div className="space-y-2 mb-5">
                       {game.attractions && (
-                        <div className="flex items-start gap-1.5 text-xs text-soccer-dark">
+                        <div className="flex items-start gap-1.5 text-xs text-soccer-cream">
                           <Disc className="w-3.5 h-3.5 text-soccer-orange shrink-0 mt-0.5" />
                           <span className="font-sans leading-tight">
                             Atração: <strong className="text-soccer-gold">{game.attractions}</strong>
@@ -309,8 +309,8 @@ export default function MatchList({
                       )}
                       
                       {/* Booking guarantees */}
-                      <div className="flex items-center gap-1.5 text-[11px] text-[#0c5927] font-semibold">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-[#0c5927] shrink-0" />
+                      <div className="flex items-center gap-1.5 text-[11px] text-emerald-400 font-semibold">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                         <span>A reserva garante entrada no telão principal</span>
                       </div>
                     </div>
@@ -320,11 +320,11 @@ export default function MatchList({
                   <div>
                     {/* Capacity Indicator Bar */}
                     <div className="mb-4">
-                      <div className="flex justify-between items-center text-[10px] font-mono text-soccer-dark/70 mb-1">
+                      <div className="flex justify-between items-center text-[10px] font-mono text-soccer-cream/40 mb-1">
                         <span>Lotação de Mesas:</span>
                         <span className="font-semibold text-soccer-gold">{stats.percentReserved}% reservada</span>
                       </div>
-                      <div className="w-full bg-[#cbdad0] h-1.5 rounded-full overflow-hidden border border-soccer-field">
+                      <div className="w-full bg-white/5 h-1.5 rounded-full overflow-hidden border border-white/5">
                         <div 
                           className="bg-gradient-to-r from-soccer-gold to-[#ca8a04] h-full rounded-full transition-all duration-500" 
                           style={{ width: `${stats.percentReserved}%` }}
@@ -340,10 +340,10 @@ export default function MatchList({
                       <button
                         id={`reserve_btn_${game.id}`}
                         onClick={() => onSelectGame(game)}
-                        className="flex-1 bg-[#094a21] hover:bg-[#073618] text-white px-4 py-2.5 rounded-xl text-xs font-semibold tracking-wide flex items-center justify-center gap-1.5 transition-all shadow-md active:scale-[0.98] cursor-pointer"
+                        className="flex-1 bg-gradient-to-r from-soccer-gold to-yellow-500 hover:from-yellow-500 hover:to-soccer-orange text-soccer-dark px-4 py-2.5 rounded-xl text-xs font-semibold tracking-wide flex items-center justify-center gap-1.5 transition-all shadow-lg active:scale-[0.98] cursor-pointer"
                       >
                         <span>Reservar Mesa</span>
-                        <ChevronRight className="w-3.5 h-3.5 text-soccer-gold" />
+                        <ChevronRight className="w-3.5 h-3.5 text-soccer-dark" />
                       </button>
 
                       {isAdmin && onEditGame && (
@@ -353,7 +353,7 @@ export default function MatchList({
                             e.stopPropagation();
                             onEditGame(game);
                           }}
-                          className="p-2.5 bg-[#e8f0ea] hover:bg-[#ca8a04] hover:text-white text-soccer-dark border border-soccer-field rounded-xl transition-all cursor-pointer"
+                          className="p-2.5 bg-black/40 hover:bg-white/5 text-soccer-cream border border-white/5 rounded-xl transition-all cursor-pointer"
                           title="Configuração do Jogo"
                         >
                           <Edit2 className="w-3.5 h-3.5" />
