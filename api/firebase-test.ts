@@ -21,11 +21,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Perform a lightweight check on the "games" collection
     const snap = await adminDb.collection("games").limit(1).get();
     const count = snap.size;
-    console.log(`[FIREBASE TEST ENDPOINT] Query success. Size: ${count}`);
+    console.log(`[FIREBASE TEST ENDPOINT] Query success on custom DB. Size: ${count}`);
 
     return res.status(200).json({
       ok: true,
-      message: "Conexão com Firestore realizada com sucesso utilizando apenas process.env no banco default!",
+      message: "Conexão com Firestore realizada com sucesso utilizando apenas process.env no banco customizado da IA Studio (ai-studio-398a270b-78a3-408b-9ac9-7aca7526146e)!",
       gamesCountInQuery: count,
       timestamp: new Date().toISOString()
     });

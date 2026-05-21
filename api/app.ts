@@ -129,7 +129,7 @@ app.get("/api/firebase-test", async (req, res) => {
     const snap = await adminDb.collection("games").limit(1).get();
     res.json({
       ok: true,
-      message: "Conexão com Firestore realizada com sucesso utilizando apenas process.env no banco default (Express)!",
+      message: "Conexão com Firestore realizada com sucesso utilizando apenas process.env no banco customizado da IA Studio (ai-studio-398a270b-78a3-408b-9ac9-7aca7526146e) (Express)!",
       gamesCountInQuery: snap.size,
       timestamp: new Date().toISOString()
     });

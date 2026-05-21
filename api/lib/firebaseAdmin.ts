@@ -4,6 +4,7 @@
  */
 
 import admin from "firebase-admin";
+import { getFirestore } from "firebase-admin/firestore";
 
 // Initialize Firebase Admin SDK using Environment Variables purely
 const finalProjectId = process.env.GOOGLE_CLOUD_PROJECT || process.env.GCP_PROJECT || process.env.FIREBASE_PROJECT_ID;
@@ -54,9 +55,12 @@ if (admin.apps.length === 0) {
   }
 }
 
-// Connect to the default Firestore database purely
-const adminDb = admin.firestore();
-console.log("[FIREBASE Admin] Connected to default Firestore database.");
+// Connect EXCLUSIVELY to query the specific non-default database ID for AI Studio
+const databaseId = "ai-studio-398a270b-78a3-408b-9ac9-7aca7526146e";
+const appInstance = admin.apps[0];
+const adminDb = getFirestore(appInstance as any, databaseId);
+
+console.log(`[FIREBASE Admin] EXCLUSIVE Connection successfully established to remote Database: "${databaseId}"`);
 
 const adminAuth = admin.auth();
 
