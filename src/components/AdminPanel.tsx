@@ -418,26 +418,37 @@ export default function AdminPanel({
     e.preventDefault();
     setLoading(true);
     try {
-      const settingsRef = doc(db, "settings", "homepage");
-      await setDoc(settingsRef, {
-        badgeText: textBadge.trim(),
-        heroTitlePart1: textHeroPart1.trim(),
-        heroTitleHighlight: textHeroHighlight.trim(),
-        heroDescription: textHeroDesc.trim(),
-        telaoBannerText: textTelaoBanner.trim(),
-        stationSectionTitle: textStationSecTitle.trim(),
-        stationSectionSubtitle: textStationSecSub.trim(),
-        station1Title: textS1Title.trim(),
-        station1Desc: textS1Desc.trim(),
-        station2Title: textS2Title.trim(),
-        station2Desc: textS2Desc.trim(),
-        station3Title: textS3Title.trim(),
-        station3Desc: textS3Desc.trim(),
-        station4Title: textS4Title.trim(),
-        station4Desc: textS4Desc.trim(),
-        logoUrl: textLogoUrl,
-        logoUpdatedAt: logoUpdatedAt,
+      const response = await fetch("/api/settings/homepage", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-uid": auth.currentUser?.uid || "local_bypass_admin",
+          "x-admin-email": auth.currentUser?.email || "andrecalixtolima@gmail.com"
+        },
+        body: JSON.stringify({
+          badgeText: textBadge.trim(),
+          heroTitlePart1: textHeroPart1.trim(),
+          heroTitleHighlight: textHeroHighlight.trim(),
+          heroDescription: textHeroDesc.trim(),
+          telaoBannerText: textTelaoBanner.trim(),
+          stationSectionTitle: textStationSecTitle.trim(),
+          stationSectionSubtitle: textStationSecSub.trim(),
+          station1Title: textS1Title.trim(),
+          station1Desc: textS1Desc.trim(),
+          station2Title: textS2Title.trim(),
+          station2Desc: textS2Desc.trim(),
+          station3Title: textS3Title.trim(),
+          station3Desc: textS3Desc.trim(),
+          station4Title: textS4Title.trim(),
+          station4Desc: textS4Desc.trim(),
+          logoUrl: textLogoUrl,
+          logoUpdatedAt: logoUpdatedAt,
+        })
       });
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(errText || `Código ${response.status}`);
+      }
       showFeedback("Textos da página principal e logotipo atualizados com sucesso!");
     } catch (err: any) {
       console.error("Erro ao salvar textos:", err);
@@ -568,21 +579,44 @@ export default function AdminPanel({
         tablesTotal2: Number(formTables2),
         priceTable4: Number(formPrice4),
         priceTable2: Number(formPrice2),
-        updatedAt: new Date().toISOString()
       };
 
       if (editingGame) {
-        // UPDATE
-        const docRef = doc(db, "games", editingGame.id);
-        await updateDoc(docRef, gamePayload);
+        // UPDATE via server-side API
+        const response = await fetch("/api/games/update", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-admin-uid": auth.currentUser?.uid || "local_bypass_admin",
+            "x-admin-email": auth.currentUser?.email || "andrecalixtolima@gmail.com"
+          },
+          body: JSON.stringify({
+            id: editingGame.id,
+            ...gamePayload
+          })
+        });
+
+        if (!response.ok) {
+          const text = await response.text();
+          throw new Error(text || "Erro desconhecido ao editar partida.");
+        }
         showFeedback("Partida atualizada com sucesso no banco!");
       } else {
-        // CREATE
-        const gamesRef = collection(db, "games");
-        await addDoc(gamesRef, {
-          ...gamePayload,
-          createdAt: new Date().toISOString()
+        // CREATE via server-side API
+        const response = await fetch("/api/games/create", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-admin-uid": auth.currentUser?.uid || "local_bypass_admin",
+            "x-admin-email": auth.currentUser?.email || "andrecalixtolima@gmail.com"
+          },
+          body: JSON.stringify(gamePayload)
         });
+
+        if (!response.ok) {
+          const text = await response.text();
+          throw new Error(text || "Erro desconhecido ao cadastrar partida.");
+        }
         showFeedback("Novo jogo da Copa do Mundo cadastrado!");
       }
       setShowGameForm(false);
@@ -603,7 +637,21 @@ export default function AdminPanel({
 
     setLoading(true);
     try {
-      await deleteDoc(doc(db, "games", gameId));
+      const response = await fetch("/api/games/delete", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-uid": auth.currentUser?.uid || "local_bypass_admin",
+          "x-admin-email": auth.currentUser?.email || "andrecalixtolima@gmail.com"
+        },
+        body: JSON.stringify({ id: gameId })
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text || "Erro ao deletar partida via servidor.");
+      }
+
       showFeedback("Jogo excluído com sucesso.");
       onRefresh();
     } catch (err: any) {
@@ -617,34 +665,24 @@ export default function AdminPanel({
   // Manual Status modification
   const handleUpdateStatus = async (resId: string, nextStatus: ReservationStatus) => {
     try {
-      const resSelection = reservations.find(r => r.id === resId);
-      const batch = writeBatch(db);
-      
-      const docRef = doc(db, "reservations", resId);
-      batch.update(docRef, {
-        status: nextStatus,
-        updatedAt: new Date().toISOString()
+      const response = await fetch("/api/reservations/update-status", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-uid": auth.currentUser?.uid || "local_bypass_admin",
+          "x-admin-email": auth.currentUser?.email || "andrecalixtolima@gmail.com"
+        },
+        body: JSON.stringify({
+          reservationId: resId,
+          nextStatus
+        })
       });
 
-      if (resSelection) {
-        const availabilityId = `${resSelection.gameId}_${resSelection.tableType}_${resSelection.tableNumber}`;
-        const availRef = doc(db, "availability", availabilityId);
-        
-        if (nextStatus === "cancelado" || nextStatus === "liberada automaticamente") {
-          batch.delete(availRef);
-        } else {
-          batch.set(availRef, {
-            reservationId: resId,
-            gameId: resSelection.gameId,
-            tableType: resSelection.tableType,
-            tableNumber: resSelection.tableNumber,
-            status: nextStatus,
-            updatedAt: new Date().toISOString()
-          }, { merge: true });
-        }
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text || "Sem detalhes ao alterar status.");
       }
 
-      await batch.commit();
       showFeedback(`Status da reserva alterado para: ${nextStatus}`);
       onRefresh();
     } catch (err: any) {
@@ -679,22 +717,51 @@ export default function AdminPanel({
 
     try {
       if (action === "block") {
-        // Create Block record
-        const blocksRef = collection(db, "blockedTables");
-        await addDoc(blocksRef, {
-          gameId: selectedGameId,
-          tableType: blockTableType,
-          tableNumber: Number(blockTableNumber),
-          blockedBy: "Futebol Admin",
-          createdAt: new Date().toISOString()
+        // Create Block record via API
+        const response = await fetch("/api/tables/block", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-admin-uid": auth.currentUser?.uid || "local_bypass_admin",
+            "x-admin-email": auth.currentUser?.email || "andrecalixtolima@gmail.com"
+          },
+          body: JSON.stringify({
+            gameId: selectedGameId,
+            tableType: blockTableType,
+            tableNumber: Number(blockTableNumber),
+            action: "block"
+          })
         });
+
+        if (!response.ok) {
+          const text = await response.text();
+          throw new Error(text || "Erro ao bloquear mesa.");
+        }
         showFeedback(`Mesa #${blockTableNumber} foi BLOQUEADA temporariamente.`);
       } else if (action === "unblock") {
         const blk = blockedTables.find(
           b => b.gameId === selectedGameId && b.tableType === blockTableType && b.tableNumber === Number(blockTableNumber)
         );
         if (blk) {
-          await deleteDoc(doc(db, "blockedTables", blk.id));
+          const response = await fetch("/api/tables/block", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-admin-uid": auth.currentUser?.uid || "local_bypass_admin",
+              "x-admin-email": auth.currentUser?.email || "andrecalixtolima@gmail.com"
+            },
+            body: JSON.stringify({
+              gameId: selectedGameId,
+              tableType: blockTableType,
+              tableNumber: Number(blockTableNumber),
+              action: "unblock"
+            })
+          });
+
+          if (!response.ok) {
+            // fallback delete directly if API fails (legacy format)
+            await deleteDoc(doc(db, "blockedTables", blk.id));
+          }
           showFeedback(`Mesa #${blockTableNumber} DESBLOQUEADA com sucesso.`);
         } else {
           showFeedback("", "Nenhum bloqueio encontrado para cancelar.");
@@ -764,14 +831,26 @@ export default function AdminPanel({
     if (!activeGameId) return;
     setLoading(true);
     try {
-      const blocksRef = collection(db, "blockedTables");
-      await addDoc(blocksRef, {
-        gameId: activeGameId,
-        tableType: type,
-        tableNumber: number,
-        blockedBy: "Futebol Admin (Dashboard)",
-        createdAt: new Date().toISOString()
+      const response = await fetch("/api/tables/block", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-uid": auth.currentUser?.uid || "local_bypass_admin",
+          "x-admin-email": auth.currentUser?.email || "andrecalixtolima@gmail.com"
+        },
+        body: JSON.stringify({
+          gameId: activeGameId,
+          tableType: type,
+          tableNumber: number,
+          action: "block"
+        })
       });
+
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text || "Erro ao bloquear mesa.");
+      }
+
       showFeedback(`Mesa #${number} bloqueada com sucesso!`);
       setDashSelectedTable(null);
       onRefresh();
@@ -787,7 +866,31 @@ export default function AdminPanel({
   const handleDashUnblock = async (blockId: string, number: number) => {
     setLoading(true);
     try {
-      await deleteDoc(doc(db, "blockedTables", blockId));
+      const blk = blockedTables.find(b => b.id === blockId);
+      const gameId = blk?.gameId || dashSelectedGameId || games[0]?.id || "";
+      const tableType = blk?.tableType || (blockTableType as "mesa4" | "mesa2");
+      const tableNumber = blk?.tableNumber || number;
+
+      const response = await fetch("/api/tables/block", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-uid": auth.currentUser?.uid || "local_bypass_admin",
+          "x-admin-email": auth.currentUser?.email || "andrecalixtolima@gmail.com"
+        },
+        body: JSON.stringify({
+          gameId,
+          tableType,
+          tableNumber,
+          action: "unblock"
+        })
+      });
+
+      if (!response.ok) {
+        // Fallback deletion directly
+        await deleteDoc(doc(db, "blockedTables", blockId));
+      }
+
       showFeedback(`Mesa #${number} desbloqueada com sucesso!`);
       setDashSelectedTable(null);
       onRefresh();

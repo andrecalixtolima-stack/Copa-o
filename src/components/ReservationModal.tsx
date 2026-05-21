@@ -172,12 +172,40 @@ export default function ReservationModal({
         })
       });
 
+      let reservationData: any;
+      const contentType = response.headers.get("content-type");
+
       if (!response.ok) {
-        const errJson = await response.json();
-        throw new Error(errJson.error || "Não foi possível concluir sua reserva no servidor.");
+        let errMsg = "Não foi possível concluir sua reserva no servidor.";
+        if (contentType && contentType.includes("application/json")) {
+          try {
+            const errJson = await response.json();
+            errMsg = errJson.error || errMsg;
+          } catch (e) {
+            console.error("Erro ao analisar JSON de erro:", e);
+          }
+        } else {
+          try {
+            const errText = await response.text();
+            if (errText && errText.length < 200 && !errText.includes("<!DOCTYPE") && !errText.includes("<html")) {
+              errMsg = errText;
+            } else {
+              errMsg = "Erro interno no servidor ao processar reserva (Resposta não-JSON).";
+            }
+          } catch (e) {
+            console.error("Erro ao ler texto de erro:", e);
+          }
+        }
+        throw new Error(errMsg);
       }
 
-      const reservationData = await response.json();
+      if (contentType && contentType.includes("application/json")) {
+        reservationData = await response.json();
+      } else {
+        const rawText = await response.text();
+        console.error("Resposta não-JSON do servidor:", rawText);
+        throw new Error("Erro no servidor: o formato da resposta da reserva é inválido.");
+      }
       
       // Store timestamp to reinforce anti-spam
       localStorage.setItem("copaco_last_res_time", Date.now().toString());

@@ -8,6 +8,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import fs from "fs";
 import admin from "firebase-admin";
+import { getFirestore } from "firebase-admin/firestore";
 import helmet from "helmet";
 import compression from "compression";
 import firebaseConfig from "./firebase-applet-config.json";
@@ -47,9 +48,17 @@ if (admin.apps.length === 0) {
 }
 
 const databaseId = firebaseConfig.firestoreDatabaseId || "(default)";
-const adminDb = databaseId !== "(default)"
-  ? (admin as any).firestore(databaseId)
-  : admin.firestore();
+let adminDb: any;
+try {
+  const appInstance = admin.apps.length > 0 ? admin.apps[0] : undefined;
+  adminDb = databaseId !== "(default)"
+    ? getFirestore(appInstance as any, databaseId)
+    : getFirestore(appInstance as any);
+  console.log(`[COPAÇO SERVER] Connected to Firestore database ID: ${databaseId}`);
+} catch (error) {
+  console.error("[COPAÇO SERVER] Failed to initialize Firestore with databaseId, falling back to default:", error);
+  adminDb = admin.firestore();
+}
 const adminAuth = admin.auth();
 
 // Secure In-Memory Rate Limiting Engine
@@ -236,7 +245,7 @@ const PORT = 3000;
         timestamp
       });
 
-      return res.status(201).json(reservationData);
+      return res.status(200).json(reservationData);
     } catch (err: any) {
       console.error("[SERVER RESERVATION EXCEPTION]:", err);
       return res.status(500).json({ error: err.message || "Erro interno do servidor ao processar reserva." });
@@ -435,6 +444,167 @@ const PORT = 3000;
 
       return res.json({ success: true });
     } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // API Route: Admin - Create Game (Server-side bypass of rules)
+  app.post("/api/games/create", adminGuard, async (req, res) => {
+    try {
+      const performerUid = req.headers["x-admin-uid"] as string;
+      const performerEmail = req.headers["x-admin-email"] as string;
+      const gamePayload = req.body;
+
+      if (!gamePayload.homeTeam || !gamePayload.awayTeam || !gamePayload.dateTime) {
+        return res.status(400).json({ error: "Campos obrigatórios ausentes para criar jogo." });
+      }
+
+      const docRef = adminDb.collection("games").doc();
+      const gameId = docRef.id;
+
+      const newGame = {
+        id: gameId,
+        ...gamePayload,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      await docRef.set(newGame);
+
+      // Audit Log
+      const logId = adminDb.collection("auditLogs").doc().id;
+      await adminDb.collection("auditLogs").doc(logId).set({
+        id: logId,
+        action: "create_game",
+        details: `Jogo ${gamePayload.homeTeam} x ${gamePayload.awayTeam} criado por ${performerEmail}.`,
+        performedBy: performerUid,
+        performedByEmail: performerEmail,
+        timestamp: new Date().toISOString()
+      });
+
+      return res.json({ success: true, id: gameId, game: newGame });
+    } catch (err: any) {
+      console.error("[SERVER GAME CREATE ERROR]:", err);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // API Route: Admin - Update Game (Server-side bypass of rules)
+  app.post("/api/games/update", adminGuard, async (req, res) => {
+    try {
+      const performerUid = req.headers["x-admin-uid"] as string;
+      const performerEmail = req.headers["x-admin-email"] as string;
+      const { id, ...gamePayload } = req.body;
+
+      if (!id) {
+        return res.status(400).json({ error: "Faltando o ID do jogo para atualizar." });
+      }
+
+      await adminDb.collection("games").doc(id).update({
+        ...gamePayload,
+        updatedAt: new Date().toISOString()
+      });
+
+      // Audit Log
+      const logId = adminDb.collection("auditLogs").doc().id;
+      await adminDb.collection("auditLogs").doc(logId).set({
+        id: logId,
+        action: "update_game",
+        details: `Jogo ${gamePayload.homeTeam || ""} x ${gamePayload.awayTeam || ""} atualizado por ${performerEmail}.`,
+        performedBy: performerUid,
+        performedByEmail: performerEmail,
+        timestamp: new Date().toISOString()
+      });
+
+      return res.json({ success: true });
+    } catch (err: any) {
+      console.error("[SERVER GAME UPDATE ERROR]:", err);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // API Route: Admin - Delete Game and its associated reservations / blocks (Cascade delete)
+  app.post("/api/games/delete", adminGuard, async (req, res) => {
+    try {
+      const performerUid = req.headers["x-admin-uid"] as string;
+      const performerEmail = req.headers["x-admin-email"] as string;
+      const { id } = req.body;
+
+      if (!id) {
+        return res.status(400).json({ error: "ID do jogo é requerido para exclusão." });
+      }
+
+      const gameDoc = await adminDb.collection("games").doc(id).get();
+      if (!gameDoc.exists) {
+        return res.status(404).json({ error: "Jogo não encontrado." });
+      }
+      const gameData = gameDoc.data();
+
+      // Delete the game doc
+      await adminDb.collection("games").doc(id).delete();
+
+      // Cascade delete reservations
+      const resSnap = await adminDb.collection("reservations").where("gameId", "==", id).get();
+      const batch = adminDb.batch();
+      resSnap.forEach(doc => {
+        batch.delete(doc.ref);
+      });
+
+      // Cascade delete blocked tables
+      const blockSnap = await adminDb.collection("blockedTables").where("gameId", "==", id).get();
+      blockSnap.forEach(doc => {
+        batch.delete(doc.ref);
+      });
+
+      // Cascade delete availability
+      const availSnap = await adminDb.collection("availability").where("gameId", "==", id).get();
+      availSnap.forEach(doc => {
+        batch.delete(doc.ref);
+      });
+
+      await batch.commit();
+
+      // Audit Log
+      const logId = adminDb.collection("auditLogs").doc().id;
+      await adminDb.collection("auditLogs").doc(logId).set({
+        id: logId,
+        action: "delete_game",
+        details: `Jogo ${gameData?.homeTeam || ""} x ${gameData?.awayTeam || ""} e suas dependências excluídos por ${performerEmail}.`,
+        performedBy: performerUid,
+        performedByEmail: performerEmail,
+        timestamp: new Date().toISOString()
+      });
+
+      return res.json({ success: true });
+    } catch (err: any) {
+      console.error("[SERVER GAME DELETE ERROR]:", err);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // API Route: Admin - Update settings documents (Server-side bypass)
+  app.post("/api/settings/homepage", adminGuard, async (req, res) => {
+    try {
+      const performerUid = req.headers["x-admin-uid"] as string;
+      const performerEmail = req.headers["x-admin-email"] as string;
+      const settingsPayload = req.body;
+
+      await adminDb.collection("settings").doc("homepage").set(settingsPayload, { merge: true });
+
+      // Audit Log
+      const logId = adminDb.collection("auditLogs").doc().id;
+      await adminDb.collection("auditLogs").doc(logId).set({
+        id: logId,
+        action: "update_settings",
+        details: `Configurações da homepage atualizadas por ${performerEmail}.`,
+        performedBy: performerUid,
+        performedByEmail: performerEmail,
+        timestamp: new Date().toISOString()
+      });
+
+      return res.json({ success: true });
+    } catch (err: any) {
+      console.error("[SERVER SETTINGS ERROR]:", err);
       return res.status(500).json({ error: err.message });
     }
   });
