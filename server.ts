@@ -17,28 +17,36 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Initialize Firebase Admin SDK for Cloud Run / Local / Vercel
+// Initialize Firebase Admin SDK for Cloud Run / Local / Vercel
+const ambientProjectId = process.env.GOOGLE_CLOUD_PROJECT || process.env.GCP_PROJECT;
+const finalProjectId = ambientProjectId && !process.env.FIREBASE_SERVICE_ACCOUNT && !(process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL)
+  ? ambientProjectId
+  : firebaseConfig.projectId;
+
+console.log(`[COPAÇO SERVER] Environment Project ID: ${ambientProjectId || "None found"}. Config Project ID: ${firebaseConfig.projectId}. Initializing Firebase Admin SDK with Project ID: ${finalProjectId}`);
+
 if (admin.apps.length === 0) {
   try {
     if (process.env.FIREBASE_SERVICE_ACCOUNT) {
       const sa = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
       admin.initializeApp({
         credential: admin.credential.cert(sa),
-        projectId: firebaseConfig.projectId
+        projectId: finalProjectId
       });
       console.log("[COPAÇO SERVER] Firebase Admin SDK initialized with Service Account.");
     } else if (process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL) {
       admin.initializeApp({
         credential: admin.credential.cert({
-          projectId: firebaseConfig.projectId,
+          projectId: finalProjectId,
           clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
           privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n")
         }),
-        projectId: firebaseConfig.projectId
+        projectId: finalProjectId
       });
       console.log("[COPAÇO SERVER] Firebase Admin SDK initialized with Private Key credentials.");
     } else {
       admin.initializeApp({
-        projectId: firebaseConfig.projectId
+        projectId: finalProjectId
       });
       console.log("[COPAÇO SERVER] Firebase Admin SDK initialized with ambient credentials.");
     }
