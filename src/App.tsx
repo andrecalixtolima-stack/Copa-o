@@ -252,13 +252,13 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#041004] text-[#f5f5f0] overflow-hidden relative">
+    <div className="min-h-screen flex flex-col bg-[#f4f8f5] text-[#051a0d] overflow-hidden relative">
       
-      {/* Ambient background blur elements for the Immersive Theme */}
+      {/* Ambient background blur elements for the Premium Light Theme */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-        <div className="absolute top-[-10%] right-[-10%] w-[600px] h-[600px] bg-[#004d1a] rounded-full blur-[120px] opacity-40"></div>
-        <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-[#f97316] rounded-full blur-[150px] opacity-20"></div>
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] bg-[#ec4899] rounded-full blur-[180px] opacity-10"></div>
+        <div className="absolute top-[-10%] right-[-10%] w-[600px] h-[600px] bg-[#86efac] rounded-full blur-[140px] opacity-25"></div>
+        <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-[#fef08a] rounded-full blur-[150px] opacity-25"></div>
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] bg-[#fed7aa] rounded-full blur-[180px] opacity-20"></div>
       </div>
 
       {/* Navigation Header */}
@@ -307,13 +307,13 @@ export default function App() {
         )}
         
         {/* HERO HEADER */}
-        <section id="hero_section" className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-soccer-dark/90 via-soccer-field/40 to-black/80 border border-white/10 p-8 md:p-12 text-center space-y-6 shadow-2xl backdrop-blur-md">
+        <section id="hero_section" className="relative rounded-3xl overflow-hidden bg-white border border-soccer-field/80 p-8 md:p-12 text-center space-y-6 shadow-xl backdrop-blur-md">
           
           {/* Subtle background sports grid */}
-          <div className="absolute inset-0 opacity-15 bg-[radial-gradient(#ebd152_1px,transparent_1px)] [background-size:24px_24px] pointer-events-none" />
+          <div className="absolute inset-0 opacity-[0.06] bg-[radial-gradient(#ca8a04_1.5px,transparent_1.5px)] [background-size:24px_24px] pointer-events-none" />
 
           {/* Golden star badge decorative flow */}
-          <div className="inline-flex items-center gap-1.5 bg-[#ec4899]/20 border border-[#ec4899]/40 px-3 py-1 rounded-full text-xs font-mono text-soccer-neon tracking-widest uppercase font-black">
+          <div className="inline-flex items-center gap-1.5 bg-soccer-neon/10 border border-soccer-neon/30 px-3 py-1 rounded-full text-xs font-mono text-soccer-neon tracking-widest uppercase font-black">
             <Sparkle className="w-3.5 h-3.5 text-soccer-neon animate-spin-slow" />
             <span>{homepageTexts.badgeText}</span>
           </div>
@@ -322,10 +322,10 @@ export default function App() {
           {homepageTexts.logoUrl ? (
             <div className="pt-2 flex justify-center animate-fade-in">
               <div className="relative group">
-                {/* Glowing neon backdrop to highlight the event crest */}
-                <div className="absolute -inset-2 bg-gradient-to-r from-soccer-gold via-soccer-orange to-yellow-500 rounded-3xl blur-xl opacity-30 group-hover:opacity-50 transition duration-700 pointer-events-none"></div>
+                {/* Glowing gold backdrop to highlight the event crest */}
+                <div className="absolute -inset-2 bg-gradient-to-r from-soccer-gold via-[#eab308] to-amber-500 rounded-3xl blur-xl opacity-20 group-hover:opacity-40 transition duration-700 pointer-events-none"></div>
                 
-                <div id="hero_logo_container" className="relative p-4 sm:p-6 bg-black/40 border border-white/10 rounded-3xl flex items-center justify-center shadow-2xl backdrop-blur-md max-w-[280px] sm:max-w-[340px] mx-auto">
+                <div id="hero_logo_container" className="relative p-4 sm:p-6 bg-[#fcfdfc] border border-soccer-field rounded-3xl flex items-center justify-center shadow-lg backdrop-blur-md max-w-[280px] sm:max-w-[340px] mx-auto">
                   <LogoImage 
                     logoUrl={homepageTexts.logoUrl}
                     logoUpdatedAt={homepageTexts.logoUpdatedAt}
@@ -337,7 +337,7 @@ export default function App() {
               </div>
             </div>
           ) : (
-            /* Elegant high-fidelity fallback when no logo is uploaded */
+            /* Elegant fallback when no logo is uploaded */
             <LogoImage 
               logoUrl={undefined}
               alt="Logo Fallback"
@@ -347,16 +347,16 @@ export default function App() {
           )}
 
           <div className="space-y-3 max-w-3xl mx-auto">
-            <h1 className="text-5xl sm:text-6xl md:text-7xl font-display font-black tracking-tight leading-[0.95] text-soccer-cream uppercase">
-              {homepageTexts.heroTitlePart1} <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#EAB308] to-[#F97316] select-none">{homepageTexts.heroTitleHighlight}</span>
+            <h1 className="text-5xl sm:text-6xl md:text-7xl font-display font-black tracking-tight leading-[0.95] text-soccer-dark uppercase">
+              {homepageTexts.heroTitlePart1} <span className="text-transparent bg-clip-text bg-gradient-to-r from-soccer-gold to-orange-600 select-none">{homepageTexts.heroTitleHighlight}</span>
             </h1>
-            <p className="text-base sm:text-lg md:text-xl text-soccer-cream/80 max-w-2xl mx-auto font-sans leading-relaxed font-light">
+            <p className="text-base sm:text-lg md:text-xl text-soccer-dark/75 max-w-2xl mx-auto font-sans leading-relaxed font-light">
               {homepageTexts.heroDescription}
             </p>
           </div>
 
           {/* Highlight text requested */}
-          <div className="inline-block bg-white/5 border border-white/10 px-6 py-3 rounded-2xl shadow-lg backdrop-blur-sm">
+          <div className="inline-block bg-soccer-field/30 border border-soccer-field px-6 py-3 rounded-2xl shadow-sm">
             <div className="flex items-center justify-center gap-2 text-soccer-gold font-display font-bold text-sm sm:text-base tracking-tight">
               <Tv className="w-5 h-5 text-soccer-gold shrink-0" />
               <span>{homepageTexts.telaoBannerText}</span>
@@ -368,63 +368,63 @@ export default function App() {
         {/* EXPERIENCE STATIONS (Cards modernos ilustrados d'o que acontece) */}
         <section id="experience_section" className="space-y-6">
           <div className="text-center space-y-2">
-            <h2 className="text-2xl sm:text-3xl font-display font-black tracking-tight text-soccer-cream uppercase">
+            <h2 className="text-2xl sm:text-3xl font-display font-black tracking-tight text-soccer-dark uppercase">
               {homepageTexts.stationSectionTitle}
             </h2>
-            <p className="text-xs sm:text-sm text-soccer-cream/60">
+            <p className="text-xs sm:text-sm text-soccer-dark/70">
               {homepageTexts.stationSectionSubtitle}
             </p>
           </div>
-
+ 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             
             {/* Telão */}
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-6 space-y-3 hover:bg-white/10 hover:border-soccer-gold/30 transition-all duration-300 group">
+            <div className="bg-white border border-soccer-field rounded-2xl p-6 space-y-3 hover:shadow-md hover:border-soccer-gold/40 transition-all duration-300 group shadow-sm">
               <div className="w-10 h-10 rounded-xl bg-soccer-gold/10 flex items-center justify-center text-soccer-gold group-hover:scale-110 transition-transform">
                 <Tv className="w-5 h-5" />
               </div>
-              <h3 className="font-display font-bold text-base text-soccer-cream uppercase tracking-tight">{homepageTexts.station1Title}</h3>
-              <p className="text-xs text-white/50 leading-relaxed">
+              <h3 className="font-display font-bold text-base text-soccer-dark uppercase tracking-tight">{homepageTexts.station1Title}</h3>
+              <p className="text-xs text-soccer-dark/80 leading-relaxed">
                 {homepageTexts.station1Desc}
               </p>
             </div>
-
+ 
             {/* DJ */}
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-6 space-y-3 hover:bg-white/10 hover:border-soccer-orange/40 transition-all duration-300 group">
+            <div className="bg-white border border-soccer-field rounded-2xl p-6 space-y-3 hover:shadow-md hover:border-soccer-orange/40 transition-all duration-300 group shadow-sm">
               <div className="w-10 h-10 rounded-xl bg-soccer-orange/10 flex items-center justify-center text-soccer-orange group-hover:scale-110 transition-transform">
                 <Music className="w-5 h-5" />
               </div>
-              <h3 className="font-display font-bold text-base text-soccer-cream uppercase tracking-tight">{homepageTexts.station2Title}</h3>
-              <p className="text-xs text-white/50 leading-relaxed">
+              <h3 className="font-display font-bold text-base text-soccer-dark uppercase tracking-tight">{homepageTexts.station2Title}</h3>
+              <p className="text-xs text-soccer-dark/80 leading-relaxed">
                 {homepageTexts.station2Desc}
               </p>
             </div>
-
+ 
             {/* Bebidas */}
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-6 space-y-3 hover:bg-white/10 hover:border-emerald-400/40 transition-all duration-300 group">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400 group-hover:scale-110 transition-transform">
+            <div className="bg-white border border-soccer-field rounded-2xl p-6 space-y-3 hover:shadow-md hover:border-emerald-500/40 transition-all duration-300 group shadow-sm">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-600 group-hover:scale-110 transition-transform">
                 <Beer className="w-5 h-5" />
               </div>
-              <h3 className="font-display font-bold text-base text-soccer-cream uppercase tracking-tight">{homepageTexts.station3Title}</h3>
-              <p className="text-xs text-white/50 leading-relaxed">
+              <h3 className="font-display font-bold text-base text-soccer-dark uppercase tracking-tight">{homepageTexts.station3Title}</h3>
+              <p className="text-xs text-soccer-dark/80 leading-relaxed">
                 {homepageTexts.station3Desc}
               </p>
             </div>
-
+ 
             {/* Sorteios, Bolão & Torcida Clima */}
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-6 space-y-3 hover:bg-white/10 hover:border-soccer-neon/40 transition-all duration-300 group">
+            <div className="bg-white border border-soccer-field rounded-2xl p-6 space-y-3 hover:shadow-md hover:border-soccer-neon/40 transition-all duration-300 group shadow-sm">
               <div className="w-10 h-10 rounded-xl bg-soccer-neon/10 flex items-center justify-center text-soccer-neon group-hover:scale-110 transition-transform">
                 <Trophy className="w-5 h-5" />
               </div>
-              <h3 className="font-display font-bold text-base text-soccer-cream uppercase tracking-tight">{homepageTexts.station4Title}</h3>
-              <p className="text-xs text-white/50 leading-relaxed">
+              <h3 className="font-display font-bold text-base text-soccer-dark uppercase tracking-tight">{homepageTexts.station4Title}</h3>
+              <p className="text-xs text-soccer-dark/80 leading-relaxed">
                 {homepageTexts.station4Desc}
               </p>
             </div>
-
+ 
           </div>
         </section>
-
+ 
         {loading ? (
           /* Loading Elegante Indicator requested */
           <div className="flex flex-col items-center justify-center py-20 gap-4">
@@ -437,10 +437,10 @@ export default function App() {
           <div>
             {/* If games list is empty, show a demo installer seeder for ease of testing */}
             {games.length === 0 && (
-              <div className="mb-12 p-8 bg-soccer-field/20 border border-soccer-gold/30 rounded-2xl text-center space-y-4 max-w-2xl mx-auto">
+              <div className="mb-12 p-8 bg-white border border-soccer-field rounded-2xl text-center space-y-4 max-w-2xl mx-auto shadow-sm">
                 <Sparkles className="w-10 h-10 text-soccer-gold mx-auto animate-bounce" />
-                <h3 className="text-lg font-display font-bold text-soccer-cream">Bem-vindo ao COPAÇO no Quinteiro!</h3>
-                <p className="text-xs text-soccer-cream/70 leading-relaxed">
+                <h3 className="text-lg font-display font-bold text-soccer-dark">Bem-vindo ao COPAÇO no Quinteiro!</h3>
+                <p className="text-xs text-soccer-dark/80 leading-relaxed">
                   Não foi encontrado nenhum jogo cadastrado no banco do Firebase. Para fins de avaliação, você pode povoar instantaneamente o seu catálogo clicando no botão abaixo:
                 </p>
                 <button
@@ -495,9 +495,9 @@ export default function App() {
       )}
 
       {/* FOOTER */}
-      <footer className="bg-[#041a0e] border-t border-soccer-field py-8 text-center mt-16 text-xs text-soccer-cream/40 font-mono">
+      <footer className="bg-[#e8f0ea] border-t border-soccer-field py-8 text-center mt-16 text-xs text-soccer-dark/70 font-mono">
         <p>© 2026 COPAÇO no Quinteiro. Todos os direitos reservados.</p>
-        <p className="text-[10px] text-soccer-gold mt-1">Desenvolvido com carinho para torcedores especiais.</p>
+        <p className="text-[10px] text-soccer-gold font-bold mt-1">Desenvolvido com carinho para torcedores especiais.</p>
       </footer>
 
     </div>

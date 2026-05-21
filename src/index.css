@@ -6,28 +6,28 @@
   --font-display: "Space Grotesk", sans-serif;
   --font-mono: "Fira Code", ui-monospace, SFMono-Regular, monospace;
 
-  /* Premium thematic colors requested */
-  --color-soccer-dark: #041004;     /* Deep forest black */
-  --color-soccer-field: #004d1a;    /* Rich green highlight */
-  --color-soccer-gold: #eab308;     /* Dynamic modern gold */
-  --color-soccer-orange: #f97316;   /* Energetic neon orange */
-  --color-soccer-neon: #ec4899;     /* Deep vibrant pink */
-  --color-soccer-cream: #f5f5f0;    /* Elegant Offwhite */
+  /* Premium light thematic colors to highlight the green & yellow brand */
+  --color-soccer-dark: #072211;     /* Deep rich green-black for high-contrast typography */
+  --color-soccer-field: #cbdad0;    /* Soft elegant light pasture green for dividers & borders */
+  --color-soccer-gold: #ca8a04;     /* Deep sports gold, highly legible on bright screens */
+  --color-soccer-orange: #ea580c;   /* energetic modern orange */
+  --color-soccer-neon: #ec4899;     /* Vibrant rose */
+  --color-soccer-cream: #051a0d;    /* Dark forest charcoal mapping for general legible text */
 }
 
 /* Custom glow animations and UI enhancements */
 @layer utilities {
   .glow-soccer-gold {
-    box-shadow: 0 0 30px -3px rgba(234, 179, 8, 0.5);
+    box-shadow: 0 0 25px -3px rgba(202, 138, 4, 0.4);
   }
   .glow-soccer-neon {
-    box-shadow: 0 0 35px -4px rgba(236, 72, 153, 0.6);
+    box-shadow: 0 0 30px -4px rgba(236, 72, 153, 0.4);
   }
 }
 
 body {
-  background-color: #041004;
-  color: #f5f5f0;
+  background-color: #f4f8f5;
+  color: #051a0d;
   font-family: var(--font-sans);
   overflow-x: hidden;
 }
@@ -41,12 +41,12 @@ h1, h2, h3, h4, h5, h6 {
   width: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #072212;
+  background: #cbdad0;
 }
 ::-webkit-scrollbar-thumb {
-  background: #eab308;
+  background: #ca8a04;
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #f97316;
+  background: #ea580c;
 }

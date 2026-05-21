@@ -138,7 +138,7 @@ export default function Header({ isAdminMode, onToggleAdminMode, homepageTexts, 
   const isUserAdmin = firebaseAdmin || localAdmin;
 
   return (
-    <header className="sticky top-0 z-50 backdrop-blur-md bg-[#041004]/80 border-b border-white/10 shadow-lg">
+    <header className="sticky top-0 z-50 backdrop-blur-md bg-[#fafbfa]/85 border-b border-soccer-field shadow-md">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-20">
           
@@ -148,34 +148,34 @@ export default function Header({ isAdminMode, onToggleAdminMode, homepageTexts, 
               logoUrl={homepageTexts?.logoUrl} 
               logoUpdatedAt={homepageTexts?.logoUpdatedAt}
               alt="Logo Copaço" 
-              className="w-12 h-12 rounded-xl object-contain bg-white/5 border border-white/10 p-1 shadow-lg shadow-orange-500/10"
+              className="w-12 h-12 rounded-xl object-contain bg-white border border-soccer-field p-1 shadow-md shadow-orange-500/10"
               fallbackType="header"
             />
             <div>
               <div className="flex items-center gap-1.5">
-                <span className="font-display font-black text-soccer-cream text-xl tracking-tighter uppercase leading-none">
-                  COPAÇO <span className="text-[#EAB308]">no Quinteiro</span>
+                <span className="font-display font-black text-soccer-dark text-xl tracking-tighter uppercase leading-none">
+                  COPAÇO <span className="text-[#ca8a04]">no Quinteiro</span>
                 </span>
               </div>
-              <p className="text-[10px] text-white/50 tracking-widest uppercase mt-1 font-mono">
+              <p className="text-[10px] text-soccer-dark/60 tracking-widest uppercase mt-1 font-mono">
                 Experiência Premium de Copa
               </p>
             </div>
           </div>
 
           {/* Destaque Telão Info */}
-          <div className="hidden md:flex items-center gap-2 bg-white/5 px-4 py-2 rounded-full border border-white/10 hover:bg-white/10 transition-all">
+          <div className="hidden md:flex items-center gap-2 bg-soccer-field/20 px-4 py-2 rounded-full border border-soccer-field/30 transition-all">
             <Ticket className="w-4 h-4 text-soccer-gold animate-pulse" />
-            <span className="text-xs text-white/80 font-medium font-sans">
+            <span className="text-xs text-soccer-dark font-medium font-sans">
               Toda reserva garante acesso ao telão principal!
             </span>
           </div>
 
           {/* Realtime Synchronized Badge */}
-          <div className="hidden sm:flex items-center gap-2 bg-emerald-950/30 border border-emerald-500/20 px-3 py-1.5 rounded-full text-emerald-400 font-mono text-[10px] uppercase tracking-widest font-bold">
+          <div className="hidden sm:flex items-center gap-2 bg-soccer-field/30 border border-soccer-field px-3 py-1.5 rounded-full text-soccer-dark font-mono text-[10px] uppercase tracking-widest font-bold">
             <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
             </span>
             <span>Realtime</span>
           </div>
@@ -188,8 +188,8 @@ export default function Header({ isAdminMode, onToggleAdminMode, homepageTexts, 
                 onClick={() => onToggleAdminMode(!isAdminMode)}
                 className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-mono font-medium transition-all duration-300 border ${
                   isAdminMode 
-                    ? "bg-[#EAB308] text-[#041004] border-[#EAB308] shadow-md shadow-yellow-500/10 font-bold"
-                    : "bg-white/5 text-white/80 border-white/10 hover:bg-white/15"
+                    ? "bg-[#EAB308] text-[#072211] border-[#EAB308] shadow-md shadow-yellow-500/10 font-bold"
+                    : "bg-white text-soccer-dark border-soccer-field hover:bg-soccer-field/30"
                 }`}
               >
                 <Shield className="w-3.5 h-3.5" />
@@ -240,14 +240,14 @@ export default function Header({ isAdminMode, onToggleAdminMode, homepageTexts, 
       </div>
 
       {showLoginModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
-          <div className="bg-[#03150b] border border-soccer-field/80 max-w-sm w-full p-6 rounded-3xl shadow-2xl relative text-center space-y-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white border border-soccer-field max-w-sm w-full p-6 rounded-3xl shadow-2xl relative text-center space-y-6">
             <button
               onClick={() => {
                 setShowLoginModal(false);
                 setPinError("");
               }}
-              className="absolute top-4 right-4 text-soccer-cream/50 hover:text-soccer-cream cursor-pointer"
+              className="absolute top-4 right-4 text-soccer-dark/50 hover:text-soccer-dark cursor-pointer animate-none"
             >
               <X className="w-5 h-5" />
             </button>
@@ -256,28 +256,28 @@ export default function Header({ isAdminMode, onToggleAdminMode, homepageTexts, 
               <div className="w-12 h-12 rounded-full bg-soccer-gold/10 text-soccer-gold flex items-center justify-center mx-auto">
                 <Shield className="w-6 h-6" />
               </div>
-              <h3 className="text-lg font-display font-black text-soccer-cream uppercase">Acesso Administrativo</h3>
-              <p className="text-xs text-soccer-cream/60 leading-relaxed font-sans">Escolha uma forma de autenticação para gerenciar o Copaço.</p>
+              <h3 className="text-lg font-display font-black text-soccer-dark uppercase">Acesso Administrativo</h3>
+              <p className="text-xs text-soccer-dark/75 leading-relaxed font-sans">Escolha uma forma de autenticação para gerenciar o Copaço.</p>
             </div>
 
             <div className="space-y-3">
               <button
                 type="button"
                 onClick={handleLogin}
-                className="w-full py-2.5 bg-white text-black hover:bg-gray-100 font-semibold text-xs rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer"
+                className="w-full py-2.5 bg-white text-soccer-dark border border-soccer-field hover:bg-soccer-field/20 font-semibold text-xs rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer shadow-sm"
               >
                 <LogIn className="w-4 h-4" />
                 Acessar com Conta Google
               </button>
 
               <div className="flex items-center gap-2 my-2 animate-pulse">
-                <span className="h-px bg-white/10 flex-grow" />
-                <span className="text-[9px] font-mono text-white/35 uppercase tracking-wider">Bypass local de Iframe</span>
-                <span className="h-px bg-white/10 flex-grow" />
+                <span className="h-px bg-soccer-field flex-grow" />
+                <span className="text-[9px] font-mono text-soccer-dark/40 uppercase tracking-wider">Bypass local de Iframe</span>
+                <span className="h-px bg-soccer-field flex-grow" />
               </div>
 
               <form onSubmit={handlePinSubmit} className="space-y-2 text-left">
-                <label className="block text-[10px] font-mono text-soccer-cream/50 uppercase ml-1">Código de Acesso Admin</label>
+                <label className="block text-[10px] font-mono text-soccer-dark/60 uppercase ml-1">Código de Acesso Admin</label>
                 <div className="flex gap-2">
                   <input
                     type="password"
@@ -285,11 +285,11 @@ export default function Header({ isAdminMode, onToggleAdminMode, homepageTexts, 
                     value={pinCode}
                     onChange={(e) => setPinCode(e.target.value)}
                     placeholder="Ex: copaco2026"
-                    className="flex-grow bg-[#051c0f] border border-soccer-field text-xs text-soccer-cream rounded-xl px-3 py-2 outline-none focus:border-soccer-gold font-mono"
+                    className="flex-grow bg-[#fafbfa] border border-soccer-field text-xs text-soccer-dark rounded-xl px-3 py-2 outline-none focus:border-soccer-gold font-mono"
                   />
                   <button
                     type="submit"
-                    className="px-4 bg-soccer-gold hover:bg-yellow-500 text-soccer-dark font-black text-xs rounded-xl transition-all cursor-pointer"
+                    className="px-4 bg-soccer-gold hover:bg-yellow-500 text-white font-black text-xs rounded-xl transition-all cursor-pointer"
                   >
                     Entrar
                   </button>

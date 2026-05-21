@@ -322,27 +322,27 @@ export default function ReservationModal({
               </div>
 
               {/* Banner de Clareza sobre Espaços e Reservas */}
-              <div className="mb-6 bg-[#031c0e] border border-soccer-gold/30 p-4 rounded-2xl text-left">
+              <div className="mb-6 bg-[#f0f9f4] border border-[#a3d9b5] p-4 rounded-2xl text-left shadow-sm">
                 <div className="flex gap-3 items-start">
                   <div className="bg-soccer-gold/10 p-2 rounded-xl text-soccer-gold h-fit shrink-0 mt-0.5">
                     <Info className="w-5 h-5" />
                   </div>
-                  <div className="space-y-1.5 text-xs text-soccer-cream">
+                  <div className="space-y-1.5 text-xs text-soccer-dark">
                     <p className="font-bold text-soccer-gold font-display uppercase tracking-wider text-[11px]">
                       Aviso Importante sobre os Espaços
                     </p>
-                    <p className="text-white/80 font-sans leading-relaxed">
+                    <p className="text-soccer-dark/80 font-sans leading-relaxed">
                       As <strong className="text-soccer-gold">reservas de mesa são exclusivas para o quintal principal</strong> (onde ficam o telão principal, DJs, sorteios, bolão e atrações especiais).
                     </p>
-                    <p className="text-soccer-cream/70 font-sans text-[11px] border-t border-soccer-field/30 pt-1.5 mt-1">
-                      💡 Outras áreas da casa possuem TVs de 50 polegadas que funcionam por <strong className="text-white">ordem de chegada</strong> de forma <strong className="text-white">100% gratuita</strong>, sem exigir reserva.
+                    <p className="text-soccer-dark/70 font-sans text-[11px] border-t border-soccer-field pt-1.5 mt-1">
+                      💡 Outras áreas da casa possuem TVs de 50 polegadas que funcionam por <strong className="text-[#0d6b2f]">ordem de chegada</strong> de forma <strong className="text-[#0d6b2f] font-bold">100% gratuita</strong>, sem exigir reserva.
                     </p>
                   </div>
                 </div>
               </div>
 
               {formError && (
-                <div className="bg-soccer-neon/10 border border-soccer-neon/40 text-soccer-cream p-4 rounded-xl text-xs flex items-center gap-2 mb-6">
+                <div className="bg-soccer-neon/10 border border-soccer-neon/40 text-soccer-dark p-4 rounded-xl text-xs flex items-center gap-2 mb-6 shadow-sm">
                   <AlertTriangle className="w-4 h-4 text-soccer-neon shrink-0 animate-pulse" />
                   <span>{formError}</span>
                 </div>
@@ -352,19 +352,19 @@ export default function ReservationModal({
                 
                 {/* Form Fields Left Side */}
                 <div className="lg:col-span-5 space-y-5">
-                  <div className="bg-soccer-dark/50 border border-soccer-field p-5 rounded-2xl space-y-4">
-                    <h4 className="text-sm font-display font-bold text-soccer-gold border-b border-soccer-field/50 pb-2 flex items-center gap-1.5">
+                  <div className="bg-white border border-soccer-field p-5 rounded-2xl space-y-4 shadow-sm text-soccer-dark">
+                    <h4 className="text-sm font-display font-bold text-soccer-gold border-b border-soccer-field pb-2 flex items-center gap-1.5">
                       <User className="w-4 h-4" />
                       1. Informações de Contato
                     </h4>
 
                     {/* Guest Name */}
                     <div>
-                      <label className="block text-[10px] font-mono text-soccer-cream/70 uppercase mb-1.5">
+                      <label className="block text-[10px] font-mono text-soccer-dark/70 uppercase mb-1.5">
                         Nome Completo
                       </label>
                       <div className="relative">
-                        <User className="absolute left-3.5 top-3 w-4 h-4 text-soccer-cream/40" />
+                        <User className="absolute left-3.5 top-3 w-4 h-4 text-soccer-dark/40" />
                         <input
                           id="client_name_input"
                           type="text"
@@ -372,7 +372,7 @@ export default function ReservationModal({
                           value={clientName}
                           onChange={(e) => setClientName(e.target.value)}
                           placeholder="Digite seu nome legal"
-                          className="w-full bg-[#03150b] border border-soccer-field focus:border-soccer-gold text-soccer-cream rounded-xl py-2.5 pl-10 pr-4 text-xs outline-none transition-all"
+                          className="w-full bg-white border border-soccer-field focus:border-soccer-gold text-soccer-dark rounded-xl py-2.5 pl-10 pr-4 text-xs outline-none transition-all"
                         />
                       </div>
                     </div>
@@ -392,11 +392,11 @@ export default function ReservationModal({
 
                     {/* Guest Phone */}
                     <div>
-                      <label className="block text-[10px] font-mono text-soccer-cream/70 uppercase mb-1.5">
+                      <label className="block text-[10px] font-mono text-soccer-dark/70 uppercase mb-1.5">
                         WhatsApp (Celular)
                       </label>
                       <div className="relative">
-                        <Phone className="absolute left-3.5 top-3 w-4 h-4 text-soccer-cream/40" />
+                        <Phone className="absolute left-3.5 top-3 w-4 h-4 text-soccer-dark/40" />
                         <input
                           id="client_phone_input"
                           type="tel"
@@ -404,23 +404,23 @@ export default function ReservationModal({
                           value={clientPhone}
                           onChange={(e) => setClientPhone(e.target.value)}
                           placeholder="(31) 99999-9999"
-                          className="w-full bg-[#03150b] border border-soccer-field focus:border-soccer-gold text-soccer-cream rounded-xl py-2.5 pl-10 pr-4 text-xs outline-none transition-all"
+                          className="w-full bg-white border border-soccer-field focus:border-soccer-gold text-soccer-dark rounded-xl py-2.5 pl-10 pr-4 text-xs outline-none transition-all"
                         />
                       </div>
                     </div>
 
                     {/* Pax Count */}
                     <div>
-                      <label className="block text-[10px] font-mono text-soccer-cream/70 uppercase mb-1.5">
+                      <label className="block text-[10px] font-mono text-soccer-dark/70 uppercase mb-1.5">
                         Quantidade de Pessoas
                       </label>
                       <div className="relative">
-                        <Users className="absolute left-3.5 top-3 w-4 h-4 text-soccer-cream/40" />
+                        <Users className="absolute left-3.5 top-3 w-4 h-4 text-soccer-dark/40" />
                         <select
                           id="pax_select"
                           value={paxCount}
                           onChange={(e) => setPaxCount(Number(e.target.value))}
-                          className="w-full bg-[#03150b] border border-soccer-field focus:border-soccer-gold text-soccer-cream rounded-xl py-2.5 pl-10 pr-4 text-xs outline-none transition-all appearance-none cursor-pointer"
+                          className="w-full bg-white border border-soccer-field focus:border-soccer-gold text-soccer-dark rounded-xl py-2.5 pl-10 pr-4 text-xs outline-none transition-all appearance-none cursor-pointer"
                         >
                           <option value={1}>1 Pessoa</option>
                           <option value={2}>2 Pessoas</option>
@@ -432,26 +432,26 @@ export default function ReservationModal({
                   </div>
 
                   {/* Summary Area */}
-                  <div className="bg-soccer-field/20 border border-soccer-gold/20 p-5 rounded-2xl">
-                    <h4 className="text-xs font-mono font-black text-soccer-cream uppercase mb-3 tracking-wider">
+                  <div className="bg-soccer-field/30 border border-soccer-field p-5 rounded-2xl text-soccer-dark">
+                    <h4 className="text-xs font-mono font-black text-soccer-dark uppercase mb-3 tracking-wider">
                       Resumo Financeiro
                     </h4>
                     <div className="space-y-2 text-xs">
                       <div className="flex justify-between">
-                        <span className="text-soccer-cream/60">Tipo de jogo:</span>
+                        <span className="text-soccer-dark/70">Tipo de jogo:</span>
                         <span className="font-mono text-soccer-gold font-bold">
                           {game.isBrazilGame ? "Premium (Brasil)" : "Gratuito"}
                         </span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-soccer-cream/60">Tipo de Mesa:</span>
-                        <span className="text-soccer-cream">
+                        <span className="text-soccer-dark/70">Tipo de Mesa:</span>
+                        <span className="text-soccer-dark font-semibold">
                           {tableType === "mesa4" ? "Mesa p/ 4 pessoas" : "Mesa p/ 2 pessoas"}
                         </span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-soccer-cream/60">Designação:</span>
-                        <span className="text-soccer-cream font-mono">
+                        <span className="text-soccer-dark/70">Designação:</span>
+                        <span className="text-soccer-dark font-mono font-bold">
                           {selectedTableNumber ? `#${selectedTableNumber}` : "Não selecionada"}
                         </span>
                       </div>
@@ -495,16 +495,16 @@ export default function ReservationModal({
 
                 {/* Table Map Grid right side */}
                 <div className="lg:col-span-7 space-y-6">
-                  <div className="bg-soccer-dark/50 border border-soccer-field p-5 rounded-2xl">
+                  <div className="bg-white border border-soccer-field p-5 rounded-2xl shadow-sm">
                     
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-soccer-field/50 pb-3 mb-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-soccer-field pb-3 mb-4">
                       <h4 className="text-sm font-display font-bold text-soccer-gold flex items-center gap-1.5">
-                        <HelpCircle className="w-4 h-4/90" />
+                        <HelpCircle className="w-4 h-4" />
                         2. Escolha sua Mesa no Mapa
                       </h4>
 
                       {/* Flex Selector */}
-                      <div className="flex bg-[#03150b] p-0.5 rounded-lg border border-soccer-field text-xs">
+                      <div className="flex bg-[#e8f2eb] p-0.5 rounded-lg border border-soccer-field text-xs">
                         <button
                           id="select_mesa4_type_btn"
                           type="button"
@@ -514,8 +514,8 @@ export default function ReservationModal({
                           }}
                           className={`px-3 py-1 rounded-md transition-all font-semibold select-none ${
                             tableType === "mesa4"
-                              ? "bg-soccer-gold text-soccer-dark shadow"
-                              : "text-soccer-cream/75 hover:text-soccer-cream"
+                              ? "bg-soccer-gold text-white shadow font-bold"
+                              : "text-soccer-dark/75 hover:text-soccer-dark"
                           }`}
                         >
                           Mesa de 4
@@ -530,8 +530,8 @@ export default function ReservationModal({
                           }}
                           className={`px-3 py-1 rounded-md transition-all font-semibold select-none disabled:opacity-40 ${
                             tableType === "mesa2"
-                              ? "bg-soccer-gold text-soccer-dark shadow"
-                              : "text-soccer-cream/75 hover:text-soccer-cream"
+                              ? "bg-soccer-gold text-white shadow font-bold"
+                              : "text-soccer-dark/75 hover:text-soccer-dark"
                           }`}
                         >
                           Mesa de 2 {paxCount > 2 && "⚠️"}
@@ -540,27 +540,27 @@ export default function ReservationModal({
                     </div>
 
                     {paxCount > 2 && tableType === "mesa4" && (
-                      <p className="text-[10px] text-soccer-cream/50 mb-3 bg-soccer-field/20 p-2 rounded-lg italic">
+                      <p className="text-[10px] text-soccer-dark/70 mb-3 bg-soccer-field/25 p-2 rounded-lg italic">
                         💡 Mesas de 4 são recomendadas para seu grupo de {paxCount} pessoas. Mesas de 2 estarão desabilitadas.
                       </p>
                     )}
 
                     {/* Visual Status Legend */}
-                    <div className="flex flex-wrap items-center gap-4 text-[10px] font-mono text-soccer-cream/60 mb-5">
+                    <div className="flex flex-wrap items-center gap-4 text-[10px] font-mono text-soccer-dark/70 mb-5">
                       <div className="flex items-center gap-1">
-                        <span className="w-3.5 h-3.5 rounded bg-emerald-800 border border-emerald-500" />
+                        <span className="w-3.5 h-3.5 rounded bg-[#0e6e30] border border-[#0c5324]" />
                         <span>Disponível</span>
                       </div>
                       <div className="flex items-center gap-1">
-                        <span className="w-3.5 h-3.5 rounded bg-soccer-gold/90 border border-soccer-gold text-soccer-dark flex items-center justify-center text-[8px] font-bold">✓</span>
+                        <span className="w-3.5 h-3.5 rounded bg-soccer-gold border border-soccer-gold text-white flex items-center justify-center text-[8px] font-bold">✓</span>
                         <span>Selecionada</span>
                       </div>
                       <div className="flex items-center gap-1">
-                        <span className="w-3.5 h-3.5 rounded bg-soccer-cream/10 border border-soccer-cream/10" />
+                        <span className="w-3.5 h-3.5 rounded bg-slate-200 border border-slate-200" />
                         <span>Reservada</span>
                       </div>
                       <div className="flex items-center gap-1">
-                        <span className="w-3.5 h-3.5 rounded bg-red-950 border border-red-800" />
+                        <span className="w-3.5 h-3.5 rounded bg-red-100 border border-red-200" />
                         <span>Bloqueada</span>
                       </div>
                     </div>
@@ -568,25 +568,25 @@ export default function ReservationModal({
                     {/* GRID DISPLAY FOR TABLES OF 4 (30 Tables) */}
                     {tableType === "mesa4" && (
                       <div>
-                        <div className="text-[11px] font-mono text-soccer-cream/70 uppercase mb-2 flex items-center justify-between">
+                        <div className="text-[11px] font-mono text-soccer-dark/80 uppercase mb-2 flex items-center justify-between">
                           <span>MESA PARA 4 PESSOAS (30 Mesas Disponíveis)</span>
                           {game.isBrazilGame && (
                             <span className="text-soccer-gold font-bold">4x R$ {Math.round((game.priceTable4 || 24) / 4)}/pessoa</span>
                           )}
                         </div>
-                        <div className="grid grid-cols-5 sm:grid-cols-6 lg:grid-cols-6 gap-3 p-4 bg-[#03150b] rounded-2xl border border-soccer-field max-h-[300px] overflow-y-auto">
+                        <div className="grid grid-cols-5 sm:grid-cols-6 lg:grid-cols-6 gap-3 p-4 bg-[#f0f9f4] rounded-2xl border border-soccer-field max-h-[300px] overflow-y-auto">
                           {mesa4Numbers.map((num) => {
                             const occupied = isTableOccupied("mesa4", num);
                             const blocked = isTableBlocked("mesa4", num);
                             const selected = selectedTableNumber === num;
 
-                            let btnStyle = "bg-emerald-900/60 text-emerald-300 border-emerald-500 hover:bg-emerald-800 hover:scale-105 cursor-pointer";
+                            let btnStyle = "bg-[#0e6e30] text-white border border-[#0c5324] hover:bg-[#0b5425] hover:scale-105 cursor-pointer shadow-sm";
                             if (occupied) {
-                              btnStyle = "bg-soccer-cream/10 text-soccer-cream/30 border-transparent cursor-not-allowed opacity-30";
+                              btnStyle = "bg-slate-200 text-slate-400 border border-slate-200 cursor-not-allowed opacity-40";
                             } else if (blocked) {
-                              btnStyle = "bg-red-950/60 text-red-400 border-red-800 cursor-not-allowed";
+                              btnStyle = "bg-red-100 text-red-500 border border-red-200 cursor-not-allowed";
                             } else if (selected) {
-                              btnStyle = "bg-soccer-gold text-soccer-dark border-soccer-gold font-bold scale-105 shadow-lg glow-soccer-gold cursor-pointer";
+                              btnStyle = "bg-soccer-gold text-white border border-soccer-gold font-bold scale-105 shadow-md glow-soccer-gold cursor-pointer";
                             }
 
                             return (
@@ -610,25 +610,25 @@ export default function ReservationModal({
                     {/* GRID DISPLAY FOR TABLES OF 2 (3 Tables) */}
                     {tableType === "mesa2" && (
                       <div>
-                        <div className="text-[11px] font-mono text-soccer-cream/70 uppercase mb-2 flex items-center justify-between">
+                        <div className="text-[11px] font-mono text-soccer-dark/80 uppercase mb-2 flex items-center justify-between">
                           <span>MESA PARA 2 PESSOAS (3 Mesas Disponíveis)</span>
                           {game.isBrazilGame && (
                             <span className="text-soccer-gold font-bold">2x R$ {Math.round((game.priceTable2 || 12) / 2)}/pessoa</span>
                           )}
                         </div>
-                        <div className="grid grid-cols-3 gap-4 p-4 bg-[#03150b] rounded-2xl border border-soccer-field">
+                        <div className="grid grid-cols-3 gap-4 p-4 bg-[#f0f9f4] rounded-2xl border border-soccer-field">
                           {mesa2Numbers.map((num) => {
                             const occupied = isTableOccupied("mesa2", num);
                             const blocked = isTableBlocked("mesa2", num);
                             const selected = selectedTableNumber === num;
 
-                            let btnStyle = "bg-emerald-900/60 text-emerald-300 border-emerald-500 hover:bg-emerald-800 hover:scale-105 cursor-pointer";
+                            let btnStyle = "bg-[#0e6e30] text-white border border-[#0c5324] hover:bg-[#0b5425] hover:scale-105 cursor-pointer shadow-sm";
                             if (occupied) {
-                              btnStyle = "bg-soccer-cream/10 text-soccer-cream/30 border-transparent cursor-not-allowed opacity-30";
+                              btnStyle = "bg-slate-200 text-slate-400 border border-slate-200 cursor-not-allowed opacity-40";
                             } else if (blocked) {
-                              btnStyle = "bg-red-950/60 text-red-400 border-red-800 cursor-not-allowed";
+                              btnStyle = "bg-red-100 text-red-500 border border-red-200 cursor-not-allowed";
                             } else if (selected) {
-                              btnStyle = "bg-soccer-gold text-soccer-dark border-soccer-gold font-bold scale-105 shadow-lg glow-soccer-gold cursor-pointer";
+                              btnStyle = "bg-soccer-gold text-white border border-soccer-gold font-bold scale-105 shadow-md glow-soccer-gold cursor-pointer";
                             }
 
                             return (
@@ -651,20 +651,20 @@ export default function ReservationModal({
 
                     {/* Field Indicator graphic */}
                     <div className="mt-5 border-t border-dashed border-soccer-field/40 pt-4 text-center">
-                      <div className="inline-block px-10 py-1 border border-soccer-gold/20 rounded-t-xl bg-soccer-field/40 font-display font-medium text-[10px] text-soccer-gold uppercase tracking-wider">
+                      <div className="inline-block px-10 py-1 border border-soccer-field/40 rounded-t-xl bg-[#e8f2eb] font-display font-medium text-[10px] text-soccer-gold uppercase tracking-wider">
                         Direção do Telão Principal 📺
                       </div>
                       <div className="w-full bg-gradient-to-r from-transparent via-soccer-gold/20 to-transparent h-1" />
                     </div>
 
                     {/* Highly visible first-come first-served seating layout warning */}
-                    <div className="mt-4 p-4 rounded-xl bg-soccer-orange/15 border border-soccer-orange/40 text-xs text-amber-200 leading-relaxed font-sans shadow-lg">
+                    <div className="mt-4 p-4 rounded-xl bg-[#fffaf5] border border-[#ffd3a3] text-xs text-soccer-dark leading-relaxed font-sans shadow-sm">
                       <div className="flex gap-2.5 items-start">
-                        <AlertTriangle className="w-5 h-5 text-soccer-orange shrink-0 mt-0.5 animate-bounce" />
+                        <AlertTriangle className="w-5 h-5 text-soccer-orange shrink-0 mt-0.5" />
                         <div>
                           <span className="font-bold text-soccer-orange block uppercase tracking-wide mb-1">REGRAS DE POSICIONAMENTO DA MESA:</span>
-                          As mesas físicas são ocupadas estritamente por <strong className="text-white underline">ordem de chegada</strong> no dia do jogo. 
-                          O número selecionado no mapa serve apenas para controle de limites e capacidade e <strong className="text-white underline">não corresponde</strong> à uma demarcação física exata ou posição definitiva no espaço do evento.
+                          As mesas físicas são ocupadas estritamente por <strong className="text-[#a04e05] underline font-bold">ordem de chegada</strong> no dia do jogo. 
+                          O número selecionado no mapa serve apenas para controle de limites e capacidade e <strong className="text-[#a04e05] underline font-bold">não corresponde</strong> à uma demarcação física exata ou posição definitiva no espaço do evento.
                         </div>
                       </div>
                     </div>
@@ -676,14 +676,14 @@ export default function ReservationModal({
                     id="submit_reservation_details_btn"
                     type="submit"
                     disabled={loading}
-                    className="w-full py-4 rounded-2xl bg-gradient-to-r from-soccer-gold to-yellow-500 hover:from-yellow-500 hover:to-soccer-orange text-soccer-dark font-display font-bold text-sm tracking-wide shadow-lg hover:shadow-soccer-gold/10 transition-all hover:-translate-y-0.5 active:scale-95 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                    className="w-full py-4 rounded-2xl bg-gradient-to-r from-soccer-gold to-[#ca8a04] hover:from-[#ca8a04] hover:to-amber-700 text-white font-display font-bold text-sm tracking-wide shadow-md transition-all hover:-translate-y-0.5 active:scale-95 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                   >
                     {loading ? (
-                      <span className="w-5 h-5 rounded-full border-2 border-soccer-dark/20 border-t-soccer-dark animate-spin" />
+                      <span className="w-5 h-5 rounded-full border-2 border-white/20 border-t-white animate-spin" />
                     ) : (
                       <>
                         <span>Avançar com Reserva</span>
-                        <ChevronRight className="w-4 h-4 text-soccer-dark" />
+                        <ChevronRight className="w-4 h-4 text-white" />
                       </>
                     )}
                   </button>
@@ -696,37 +696,37 @@ export default function ReservationModal({
 
           {/* STEP 2: PIX PAYMENT (BRAZIL GAMES ONLY) */}
           {step === "payment" && createdReservation && (
-            <div className="max-w-xl mx-auto text-center space-y-6">
+            <div className="max-w-xl mx-auto text-center space-y-6 text-soccer-dark">
               <div className="w-16 h-16 bg-soccer-gold/10 border border-soccer-gold/30 rounded-full flex items-center justify-center mx-auto">
                 <Clipboard className="w-7 h-7 text-soccer-gold animate-pulse" />
               </div>
 
               <div>
-                <span className="text-[10px] font-mono text-soccer-neon uppercase tracking-widest block mb-1">
+                <span className="text-[10px] font-mono text-soccer-gold font-bold uppercase tracking-widest block mb-1">
                   AGUARDANDO PAGAMENTO PIX
                 </span>
-                <h3 className="text-2xl font-display font-black text-soccer-cream">
+                <h3 className="text-2xl font-display font-black text-soccer-dark">
                   Efetue o pagamento de R$ {calculatePrice()},00
                 </h3>
-                <p className="text-xs text-soccer-cream/70 mt-2">
+                <p className="text-xs text-soccer-dark/70 mt-2">
                   As mesas de jogos do Brasil são concorridas e necessitam de comprovação de depósito via PIX para garantia de vaga.
                 </p>
               </div>
 
               {/* PIX Key and Value Card */}
-              <div className="bg-[#03150b] border border-soccer-field p-6 rounded-2xl space-y-4">
-                <div className="text-left bg-soccer-dark/60 p-4 rounded-xl border border-soccer-field/50">
-                  <span className="block text-[10px] font-mono text-soccer-gold uppercase">Chave PIX (CNPJ)</span>
+              <div className="bg-white border border-[#ca8a04]/40 p-6 rounded-2xl space-y-4 shadow-sm text-soccer-dark animate-none">
+                <div className="text-left bg-[#f4faf6] p-4 rounded-xl border border-soccer-field">
+                  <span className="block text-[10px] font-mono text-soccer-gold uppercase font-bold">Chave PIX (CNPJ)</span>
                   <div className="flex items-center justify-between mt-1">
-                    <span className="font-mono text-sm text-soccer-cream font-semibold">48558675000187</span>
+                    <span className="font-mono text-sm text-soccer-dark font-semibold">48558675000187</span>
                     <button
                       id="copy_pix_key_btn"
                       onClick={handleCopyPix}
-                      className="px-3 py-1.5 bg-soccer-field hover:bg-soccer-field/80 text-soccer-gold font-mono text-[10px] uppercase rounded-lg transition-colors flex items-center gap-1 font-semibold cursor-pointer"
+                      className="px-3 py-1.5 bg-[#e8f2eb] hover:bg-soccer-field text-soccer-dark font-mono text-[10px] uppercase rounded-lg transition-colors flex items-center gap-1 font-semibold cursor-pointer border border-soccer-field"
                     >
                       {copied ? (
                         <>
-                          <Check className="w-3.5 h-3.5 text-emerald-400" />
+                          <Check className="w-3.5 h-3.5 text-emerald-600" />
                           <span>Copiado!</span>
                         </>
                       ) : (
@@ -739,12 +739,12 @@ export default function ReservationModal({
                   </div>
                 </div>
 
-                <div className="text-left bg-soccer-dark/60 p-4 rounded-xl border border-soccer-field/50 flex justify-between items-center">
+                <div className="text-left bg-[#f4faf6] p-4 rounded-xl border border-soccer-field flex justify-between items-center">
                   <div>
-                    <span className="block text-[10px] font-mono text-soccer-gold uppercase">Valor do Pix</span>
-                    <span className="font-display text-lg text-soccer-cream font-extrabold font-mono">R$ {calculatePrice()},00</span>
+                    <span className="block text-[10px] font-mono text-soccer-gold uppercase font-bold">Valor do Pix</span>
+                    <span className="font-display text-lg text-soccer-dark font-extrabold font-mono">R$ {calculatePrice()},00</span>
                   </div>
-                  <div className="text-right text-[10px] font-mono text-soccer-cream/50">
+                  <div className="text-right text-[10px] font-mono text-soccer-dark/60">
                     Mesa #{selectedTableNumber}<br />
                     Para {paxCount} pessoas
                   </div>
@@ -752,9 +752,9 @@ export default function ReservationModal({
               </div>
 
               {/* Instructions and CTA buttons */}
-              <div className="bg-soccer-neon/10 border border-soccer-neon/20 p-5 rounded-2xl text-xs text-left text-soccer-cream leading-relaxed space-y-2">
-                <p className="font-semibold text-soccer-neon text-xs">Instruções Importantes:</p>
-                <ol className="list-decimal list-inside space-y-1.5 text-soccer-cream/80 text-[11px]">
+              <div className="bg-[#fff0f3] border border-pink-200 p-5 rounded-2xl text-xs text-left text-soccer-dark leading-relaxed space-y-2 shadow-sm">
+                <p className="font-semibold text-[#c01d44] text-xs">Instruções Importantes:</p>
+                <ol className="list-decimal list-inside space-y-1.5 text-soccer-dark/90 text-[11px]">
                   <li>Copie o CNPJ acima e faça a transferência em seu app bancário.</li>
                   <li>Clique no botão abaixo para abrir o WhatsApp oficial de confirmações do Quinteiro.</li>
                   <li>Envie o comprovante de transferência diretamente pelo chat.</li>
@@ -768,15 +768,15 @@ export default function ReservationModal({
                     window.open(whatsappUrl, "_blank", "noopener,noreferrer");
                     setStep("success");
                   }}
-                  className="flex-1 bg-gradient-to-r from-emerald-600 to-green-700 hover:from-emerald-500 hover:to-green-600 text-soccer-cream py-3.5 rounded-xl text-xs font-display font-bold flex items-center justify-center gap-2 shadow-lg cursor-pointer"
+                  className="flex-1 bg-[#128c7e] hover:bg-[#075e54] text-white py-3.5 rounded-xl text-xs font-display font-bold flex items-center justify-center gap-2 shadow-md cursor-pointer"
                 >
                   <span>Abrir WhatsApp & Enviar Comprovante</span>
-                  <ExternalLink className="w-4 h-4 text-soccer-cream" />
+                  <ExternalLink className="w-4 h-4 text-white" />
                 </button>
                 <button
                   id="confirm_already_sent_btn"
                   onClick={() => setStep("success")}
-                  className="px-6 py-3.5 bg-soccer-field border border-soccer-field/60 hover:bg-soccer-field/90 text-soccer-gold rounded-xl text-xs font-mono font-medium hover:border-soccer-gold/40 transition-colors"
+                  className="px-6 py-3.5 bg-[#e8f2eb] border border-soccer-field hover:bg-soccer-field text-soccer-dark rounded-xl text-xs font-mono font-medium hover:border-soccer-gold/40 transition-colors cursor-pointer"
                 >
                   Já enviei / Concluir
                 </button>
@@ -786,65 +786,65 @@ export default function ReservationModal({
 
           {/* STEP 3: SUCCESS CONFIRMATION AND THANK YOU */}
           {step === "success" && (
-            <div className="max-w-xl mx-auto text-center space-y-6 py-6 animate-fade-in">
-              <div className="w-16 h-16 bg-emerald-500/10 border border-emerald-500/30 rounded-full flex items-center justify-center mx-auto">
-                <Check className="w-8 h-8 text-emerald-400" />
+            <div className="max-w-xl mx-auto text-center space-y-6 py-6 animate-fade-in text-soccer-dark">
+              <div className="w-16 h-16 bg-[#eaf5ed] border border-[#a3d9b5] rounded-full flex items-center justify-center mx-auto">
+                <Check className="w-8 h-8 text-[#0d6b2f]" />
               </div>
 
               <div>
-                <span className="text-[10px] font-mono text-emerald-400 uppercase tracking-widest block mb-1">
+                <span className="text-[10px] font-mono text-[#0c5927] font-bold uppercase tracking-widest block mb-1">
                   RESERVA CONFIRMADA
                 </span>
-                <h3 className="text-3xl font-display font-black text-soccer-cream">
+                <h3 className="text-3xl font-display font-black text-soccer-dark">
                   Sua mesa está reservada!
                 </h3>
-                <p className="text-sm text-soccer-cream/80 mt-2 font-display">
+                <p className="text-sm text-soccer-dark/80 mt-2 font-display font-bold">
                   Tudo pronto para o COPAÇO no Quinteiro!
                 </p>
               </div>
 
               {createdReservation && (
-                <div className="bg-[#03150b] border border-soccer-field/80 p-5 rounded-2xl text-left space-y-3 font-mono text-xs">
-                  <div className="flex justify-between border-b border-soccer-field/30 pb-2">
-                    <span className="text-soccer-cream/40">Código da Reserva:</span>
+                <div className="bg-[#f4faf6] border border-soccer-field p-5 rounded-2xl text-left space-y-3 font-mono text-xs text-soccer-dark shadow-sm">
+                  <div className="flex justify-between border-b border-soccer-field/40 pb-2">
+                    <span className="text-soccer-dark/50">Código da Reserva:</span>
                     <span className="text-soccer-gold font-bold">{createdReservation.id?.substring(0, 8).toUpperCase()}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-soccer-cream/40">Jogo:</span>
-                    <span className="text-soccer-cream font-semibold">{createdReservation.gameName}</span>
+                    <span className="text-soccer-dark/50">Jogo:</span>
+                    <span className="text-soccer-dark font-semibold">{createdReservation.gameName}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-soccer-cream/40">Mesa Reservada:</span>
+                    <span className="text-soccer-dark/50">Mesa Reservada:</span>
                     <span className="text-soccer-gold font-bold">
                       {createdReservation.tableType === "mesa4" ? "Mesa para 4 Pessoas" : "Mesa para 2 Pessoas"} - Número #{createdReservation.tableNumber}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-soccer-cream/40">Convidado Principal:</span>
-                    <span className="text-soccer-cream font-semibold">{createdReservation.clientName}</span>
+                    <span className="text-soccer-dark/50">Convidado Principal:</span>
+                    <span className="text-soccer-dark font-semibold">{createdReservation.clientName}</span>
                   </div>
                 </div>
               )}
 
               {/* Text specifics from request criteria */}
-              <div className="bg-soccer-field/30 p-5 rounded-2xl border border-soccer-gold/20 text-xs text-left text-soccer-cream leading-relaxed space-y-3">
+              <div className="bg-soccer-field/30 p-5 rounded-2xl border border-soccer-field text-xs text-left text-soccer-dark leading-relaxed space-y-3 shadow-sm">
                 {game.isBrazilGame ? (
                   <>
-                    <p className="font-semibold text-soccer-gold text-xs">Informações finais e check-in:</p>
-                    <p className="text-soccer-cream/90 text-xs leading-relaxed">
+                    <p className="font-bold text-soccer-gold text-xs">Informações finais e check-in:</p>
+                    <p className="text-soccer-dark/90 text-xs leading-relaxed font-sans">
                       Sua reserva garante acesso à área do telão principal do COPAÇO, com DJ, promoções especiais de bebidas, sorteios e bolão durante o jogo!
                     </p>
-                    <p className="text-soccer-cream/90 text-xs leading-relaxed font-semibold text-soccer-orange">
+                    <p className="text-soccer-dark/95 text-xs leading-relaxed font-bold text-soccer-orange font-sans">
                       As mesas são ocupadas por ordem de chegada no bar. Nos vemos no jogo!
                     </p>
                   </>
                 ) : (
                   <>
-                    <p className="font-semibold text-soccer-gold text-xs">Regras da Reserva Gratuita:</p>
-                    <p className="text-soccer-cream/90 text-[11px] leading-relaxed">
+                    <p className="font-bold text-soccer-gold text-xs">Regras da Reserva Gratuita:</p>
+                    <p className="text-soccer-dark/90 text-[11px] leading-relaxed font-sans">
                       Lembramos que as reservas gratuitas são válidas até 1 hora antes do início da partida. Após esse prazo, a mesa poderá ser liberada automaticamente para novos clientes.
                     </p>
-                    <p className="text-soccer-cream/90 text-xs font-semibold text-soccer-orange leading-relaxed pt-1">
+                    <p className="text-soccer-dark/95 text-xs font-bold text-soccer-orange leading-relaxed pt-1 font-sans">
                       As mesas são ocupadas por ordem de chegada. Nos vemos no jogo!
                     </p>
                   </>
