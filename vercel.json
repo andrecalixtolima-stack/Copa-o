@@ -6,6 +6,14 @@
       "destination": "/api/reservations/create"
     },
     {
+      "source": "/api/test",
+      "destination": "/api/test"
+    },
+    {
+      "source": "/api/firebase-test",
+      "destination": "/api/firebase-test"
+    },
+    {
       "source": "/api/:path*",
       "destination": "/api/index"
     },

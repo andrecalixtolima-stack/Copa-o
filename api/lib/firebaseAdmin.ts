@@ -4,72 +4,60 @@
  */
 
 import admin from "firebase-admin";
-import { getFirestore } from "firebase-admin/firestore";
-import firebaseConfig from "../../firebase-applet-config.json";
 
-// Initialize Firebase Admin SDK with safety guards for Serverless environments (Vercel)
-const ambientProjectId = process.env.GOOGLE_CLOUD_PROJECT || process.env.GCP_PROJECT;
-const finalProjectId = ambientProjectId && !process.env.FIREBASE_SERVICE_ACCOUNT && !(process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL)
-  ? ambientProjectId
-  : firebaseConfig.projectId;
+// Initialize Firebase Admin SDK using Environment Variables purely
+const finalProjectId = process.env.GOOGLE_CLOUD_PROJECT || process.env.GCP_PROJECT || process.env.FIREBASE_PROJECT_ID;
+const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+let privateKey = process.env.FIREBASE_PRIVATE_KEY;
 
-console.log(`[FIREBASE Admin] Ambient Project ID: ${ambientProjectId || "None"}. Config Project ID: ${firebaseConfig.projectId}. Target Project: ${finalProjectId}`);
+console.log(`[FIREBASE Admin] Initializing Admin with Env Vars: ProjectID: ${finalProjectId || "None"}, ClientEmail: ${clientEmail ? "Provided" : "Missing"}, PrivateKey: ${privateKey ? "Provided" : "Missing"}`);
+
+if (!finalProjectId || !clientEmail || !privateKey) {
+  console.error("[FIREBASE Admin] CRITICAL ERROR: GOOGLE_CLOUD_PROJECT, FIREBASE_CLIENT_EMAIL, or FIREBASE_PRIVATE_KEY is missing! Please configure the environment variables.");
+}
 
 if (admin.apps.length === 0) {
   try {
-    if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-      const sa = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-      admin.initializeApp({
-        credential: admin.credential.cert(sa),
-        projectId: finalProjectId
-      });
-      console.log("[FIREBASE Admin] Initialized with Service Account.");
-    } else if (process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL) {
-      let privateKey = process.env.FIREBASE_PRIVATE_KEY;
-      if (privateKey) {
-        // Strip outer double or single quotes if they leaked from Vercel's env parsing
-        if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
-          privateKey = privateKey.slice(1, -1);
-        } else if (privateKey.startsWith("'") && privateKey.endsWith("'")) {
-          privateKey = privateKey.slice(1, -1);
-        }
-        // Replace literal escaped sequence \n with actual raw line-breaks
-        privateKey = privateKey.replace(/\\n/g, "\n");
+    if (privateKey && clientEmail && finalProjectId) {
+      // Recursively trim and strip surrounding quotes
+      privateKey = privateKey.trim();
+      while (
+        (privateKey.startsWith('"') && privateKey.endsWith('"')) ||
+        (privateKey.startsWith("'") && privateKey.endsWith("'"))
+      ) {
+        privateKey = privateKey.slice(1, -1).trim();
       }
+
+      // Replace literal escaped sequence \n and double escaped \\n with actual raw line-breaks
+      privateKey = privateKey.replace(/\\n/g, "\n").replace(/\\\\n/g, "\n");
+
+      // Log safe debugging metrics to help diagnose incorrect certificate formatting
+      const hasHeader = privateKey.includes("-----BEGIN PRIVATE KEY-----");
+      const hasFooter = privateKey.includes("-----END PRIVATE KEY-----");
+      console.log(`[FIREBASE Admin Debug] Sanitized Key - Length: ${privateKey.length}, Has Header: ${hasHeader}, Has Footer: ${hasFooter}`);
 
       admin.initializeApp({
         credential: admin.credential.cert({
           projectId: finalProjectId,
-          clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+          clientEmail: clientEmail,
           privateKey: privateKey
         }),
         projectId: finalProjectId
       });
-      console.log("[FIREBASE Admin] Initialized with Private Key credentials.");
+      console.log("[FIREBASE Admin] Initialized with Private Key credentials (process.env.FIREBASE_PRIVATE_KEY).");
     } else {
-      admin.initializeApp({
-        projectId: finalProjectId
-      });
-      console.log("[FIREBASE Admin] Initialized with ambient / default credentials (ADC).");
+      throw new Error("Missing required environment variables (GOOGLE_CLOUD_PROJECT, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY) to initialize Firebase Admin cert.");
     }
   } catch (error) {
     console.error("[FIREBASE Admin] Exception during initialization:", error);
+    throw error;
   }
 }
 
-const databaseId = firebaseConfig.firestoreDatabaseId || "(default)";
-let adminDb: any;
-try {
-  const appInstance = admin.apps.length > 0 ? admin.apps[0] : undefined;
-  adminDb = databaseId !== "(default)"
-    ? getFirestore(appInstance as any, databaseId)
-    : getFirestore(appInstance as any);
-  console.log(`[FIREBASE Admin] Successfully connected to database ID: ${databaseId}`);
-} catch (error) {
-  console.error("[FIREBASE Admin] Failed to initialize Firestore with custom databaseId. Falling back to default DB:", error);
-  adminDb = admin.firestore();
-}
+// Connect to the default Firestore database purely
+const adminDb = admin.firestore();
+console.log("[FIREBASE Admin] Connected to default Firestore database.");
 
 const adminAuth = admin.auth();
 
-export { admin, adminDb, adminAuth, firebaseConfig };
+export { admin, adminDb, adminAuth };
