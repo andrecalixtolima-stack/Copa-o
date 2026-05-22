@@ -347,7 +347,7 @@ export default function App() {
           )}
 
           <div className="space-y-3 max-w-3xl mx-auto">
-            <h1 className="text-5xl sm:text-6xl md:text-7xl font-display font-black tracking-tight leading-[0.95] text-soccer-cream uppercase">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-display font-black tracking-tight leading-[1.05] text-soccer-cream uppercase">
               {homepageTexts.heroTitlePart1} <span className="text-transparent bg-clip-text bg-gradient-to-r from-soccer-gold to-orange-600 select-none">{homepageTexts.heroTitleHighlight}</span>
             </h1>
             <p className="text-base sm:text-lg md:text-xl text-soccer-cream/80 max-w-2xl mx-auto font-sans leading-relaxed font-light">
@@ -363,6 +363,66 @@ export default function App() {
             </div>
           </div>
 
+        </section>
+
+        {/* Guia explicativo de Espaços e Reservas */}
+        <section id="spaces_guide_section">
+          <div className="bg-black/40 border border-white/5 rounded-3xl p-6 md:p-8 space-y-4 text-left">
+            <div className="flex flex-col lg:flex-row gap-6 items-start justify-between">
+              <div className="space-y-4 flex-1">
+                <span className="text-xs font-mono text-soccer-gold font-bold uppercase tracking-widest bg-soccer-gold/10 px-3 py-1 rounded-full inline-block">
+                  📍 Guia de Espaços & Reservas
+                </span>
+                <h3 className="text-xl md:text-2xl font-display font-black text-soccer-cream uppercase leading-snug">
+                  Quintal Principal (Área de Reservas)
+                </h3>
+                <p className="text-xs sm:text-sm text-soccer-cream/80 leading-relaxed font-sans">
+                  As reservas de mesa no sistema são <strong className="text-soccer-gold">exclusivas para o Quintal Principal</strong>. Este é o sector premium do evento, onde estarão localizados:
+                </p>
+                <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-soccer-cream/95 font-sans pl-1">
+                  <li className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-soccer-gold" />
+                    <span>Telão Principal de Alta Definição</span>
+                  </li>
+                  <li className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-soccer-gold" />
+                    <span>Sets de DJs exclusivos no intervalo e pós-jogo</span>
+                  </li>
+                  <li className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-soccer-gold" />
+                    <span>Sorteios presenciais e bolão interativo</span>
+                  </li>
+                  <li className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-soccer-gold" />
+                    <span>Ações com patrocinadores e distribuição de brindes</span>
+                  </li>
+                </ul>
+              </div>
+
+              <div className="lg:w-80 w-full bg-soccer-field/15 border border-white/5 rounded-2xl p-5 space-y-3 shrink-0">
+                <h4 className="text-[10px] font-mono text-soccer-gold font-bold uppercase tracking-wider block border-b border-white/5 pb-1.5">
+                  Outros Ambientes (Acesso de Graça)
+                </h4>
+                <p className="text-xs text-soccer-cream/90 leading-relaxed font-sans">
+                  As demais dependências e varandas do Quinteiro terão mesas e cadeiras com visão para <strong className="text-[#0c5927]">TVs de 50 polegadas</strong> de alta qualidade.
+                </p>
+                <div className="space-y-1.5 text-[11px] text-soccer-cream/80 font-mono">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-soccer-orange" />
+                    <span>Ordem de chegada livre</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-soccer-orange" />
+                    <span>Entrada 100% gratuita</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-soccer-orange" />
+                    <span>Não exige reserva de mesa</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </section>
 
         {/* EXPERIENCE STATIONS (Cards modernos ilustrados d'o que acontece) */}
