@@ -173,7 +173,8 @@ app.post("/api/reservations/create", createRateLimiter(10, 5 * 60 * 1000), async
   try {
     const { 
       gameId, gameName, gameDateTime, isBrazilGame, 
-      clientName, clientPhone, paxCount, tableType, tableNumber 
+      clientName, clientPhone, paxCount, tableType, tableNumber,
+      paymentMethod, paymentId, status
     } = req.body;
 
     console.log(`[EXPRESS RESERVATION] Table #${tableNumber} for Game: ${gameName}. Client: ${clientName}`);
@@ -199,7 +200,9 @@ app.post("/api/reservations/create", createRateLimiter(10, 5 * 60 * 1000), async
 
     // 2. Construct payloads and write atomically
     const resId = adminDb.collection("reservations").doc().id;
-    const initialStatus = isBrazilGame ? "aguardando comprovante" : "confirmado";
+    
+    // Default to 'confirmado' for PagSeguro or non-Brazil games, otherwise 'aguardando comprovante'
+    const initialStatus = status || (paymentMethod === "pagseguro" ? "confirmado" : (isBrazilGame ? "aguardando comprovante" : "confirmado"));
     const timestamp = new Date().toISOString();
 
     const reservationData = {
@@ -214,6 +217,8 @@ app.post("/api/reservations/create", createRateLimiter(10, 5 * 60 * 1000), async
       tableType,
       tableNumber: Number(tableNumber),
       status: initialStatus,
+      paymentMethod: paymentMethod || (isBrazilGame ? "pix" : "gratis"),
+      paymentId: paymentId || "",
       createdAt: timestamp,
       updatedAt: timestamp
     };
@@ -221,6 +226,9 @@ app.post("/api/reservations/create", createRateLimiter(10, 5 * 60 * 1000), async
     const availabilityData = {
       reservationId: resId,
       gameId,
+      gameName,
+      clientName: clientName.trim(),
+      clientPhone: clientPhone.trim(),
       tableType,
       tableNumber: Number(tableNumber),
       status: initialStatus,
@@ -251,6 +259,74 @@ app.post("/api/reservations/create", createRateLimiter(10, 5 * 60 * 1000), async
   } catch (err: any) {
     console.error("[SERVER RESERVATION EXCEPTION]:", err);
     return res.status(500).json({ error: err.message || "Erro interno do servidor ao processar reserva." });
+  }
+});
+
+// API Route: Public - Confirm Card Payment (PagSeguro) or completed PIX
+app.post("/api/reservations/confirm-payment", createRateLimiter(20, 5 * 60 * 1000), async (req, res) => {
+  try {
+    const { reservationId, paymentMethod, paymentId } = req.body;
+
+    if (!reservationId || !paymentMethod) {
+      return res.status(400).json({ error: "Faltando dados identificadores de pagamento." });
+    }
+
+    const resRef = adminDb.collection("reservations").doc(reservationId);
+    const resSnap = await resRef.get();
+
+    if (!resSnap.exists) {
+      return res.status(404).json({ error: "Reserva correspondente não foi encontrada." });
+    }
+
+    const resData = resSnap.data()!;
+    const availabilityId = `${resData.gameId}_${resData.tableType}_${resData.tableNumber}`;
+    const availRef = adminDb.collection("availability").doc(availabilityId);
+
+    const timestamp = new Date().toISOString();
+
+    const batch = adminDb.batch();
+    
+    // Update reservation with confirmed status and payment details
+    batch.update(resRef, {
+      status: "confirmado",
+      paymentMethod: paymentMethod,
+      paymentId: paymentId || "",
+      updatedAt: timestamp
+    });
+
+    // Update availability to matching confirmed status
+    batch.set(availRef, {
+      status: "confirmado",
+      updatedAt: timestamp
+    }, { merge: true });
+
+    await batch.commit();
+
+    // Log the transaction
+    try {
+      const auditLogId = adminDb.collection("auditLogs").doc().id;
+      await adminDb.collection("auditLogs").doc(auditLogId).set({
+        id: auditLogId,
+        action: "confirm_payment",
+        details: `Pagamento confirmado via ${paymentMethod.toUpperCase()} p/ mesa #${resData.tableNumber} do jogo ${resData.gameName}.`,
+        performedBy: "Public Payment API",
+        performedByEmail: resData.clientPhone || "Public Client",
+        timestamp
+      });
+    } catch (auditErr) {
+      console.error("[AUDIT LOG ERROR] Non-blocking writer:", auditErr);
+    }
+
+    return res.status(200).json({ 
+      success: true, 
+      id: reservationId, 
+      status: "confirmado", 
+      paymentMethod, 
+      paymentId 
+    });
+  } catch (err: any) {
+    console.error("[SERVER PAYMENT CONFIRMATION EXCEPTION]:", err);
+    return res.status(500).json({ error: err.message || "Erro ao processar confirmação de pagamento." });
   }
 });
 

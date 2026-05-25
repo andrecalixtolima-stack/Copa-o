@@ -13,7 +13,7 @@ import ReservationModal from "./components/ReservationModal";
 import AdminPanel from "./components/AdminPanel";
 import LogoImage from "./components/LogoImage";
 import { 
-  Tv, Music, Beer, Trophy, Gift, Users2, Sparkles, HelpCircle, Star, Sparkle, RefreshCw, Eye 
+  Tv, Music, Beer, Trophy, Gift, Users2, Sparkles, HelpCircle, Star, Sparkle, RefreshCw, Eye, X, ExternalLink
 } from "lucide-react";
 
 export default function App() {
@@ -45,6 +45,23 @@ export default function App() {
   const [isFirebaseAdmin, setIsFirebaseAdmin] = useState(false);
   const [selectedGame, setSelectedGame] = useState<Game | null>(null);
   const [gameToEdit, setGameToEdit] = useState<Game | null>(null);
+  
+  const [showMethaBanner, setShowMethaBanner] = useState(() => {
+    try {
+      return !localStorage.getItem("dismissed_metha_banner");
+    } catch {
+      return true;
+    }
+  });
+
+  const handleDismissMethaBanner = () => {
+    try {
+      localStorage.setItem("dismissed_metha_banner", "true");
+    } catch (e) {
+      console.warn("localStorage is not available.");
+    }
+    setShowMethaBanner(false);
+  };
 
   const [seeding, setSeeding] = useState(false);
   const [connectionError, setConnectionError] = useState<{ message: string; code?: string; path?: string } | null>(null);
@@ -559,6 +576,70 @@ export default function App() {
         <p>© 2026 COPAÇO no Quinteiro. Todos os direitos reservados.</p>
         <p className="text-[10px] text-soccer-gold/80 mt-1">Desenvolvido com carinho para torcedores especiais.</p>
       </footer>
+
+      {/* FLOATING METHA ENERGIA PROMO BANNER */}
+      {showMethaBanner && (
+        <div className="fixed bottom-4 right-4 left-4 sm:left-auto sm:w-[410px] bg-gradient-to-br from-[#0a2714] to-[#03150b] border-2 border-soccer-gold/80 rounded-2xl p-5 shadow-2xl z-50 animate-fade-in text-soccer-cream border-t-soccer-gold">
+          <button
+            onClick={handleDismissMethaBanner}
+            className="absolute top-3 right-3 p-1 rounded-full text-soccer-cream/50 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
+            title="Fechar banner"
+          >
+            <X className="w-4 h-4" />
+          </button>
+
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 bg-soccer-gold/15 rounded-xl border border-soccer-gold/30 flex items-center justify-center shrink-0">
+              <span className="text-xl">⚡</span>
+            </div>
+            <div className="space-y-1">
+              <span className="text-[9px] font-mono text-soccer-gold font-black uppercase tracking-widest block font-bold">PARCERIA COPAÇO</span>
+              <h4 className="text-sm font-display font-black text-white uppercase leading-tight">Sua conta de Luz até 15% mais barata!</h4>
+            </div>
+          </div>
+
+          <p className="text-xs text-soccer-cream/90 mt-3 leading-relaxed font-sans">
+            Levando sua conta para a <strong className="text-soccer-gold">Metha Energia</strong>, você garante até 15% de desconto e ainda concorre a prêmios especiais nos jogos do Brasil! 🇧🇷
+          </p>
+
+          <div className="my-3 p-3 bg-black/40 rounded-xl border border-soccer-field/30 space-y-1.5 text-xs text-left">
+            <span className="font-bold text-soccer-gold flex items-center gap-1 text-[11px]">
+              🎁 Sorteios ao vivo no Copaço:
+            </span>
+            <div className="grid grid-cols-1 gap-1 text-[11px] text-soccer-cream/90 font-sans">
+              <div className="flex items-center gap-1.5">
+                <span className="text-soccer-gold font-bold">•</span>
+                <span>Camisas personalizadas da torcida</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-soccer-gold font-bold">•</span>
+                <span>Até 6 meses de conta de energia <strong className="text-emerald-400 font-bold">GRÁTIS</strong></span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-soccer-gold font-bold">•</span>
+                <span>A sua conta <strong className="text-emerald-400 font-bold">ZERADA</strong></span>
+              </div>
+            </div>
+            <p className="text-[10px] text-soccer-cream/50 font-mono italic">
+              Realizados ao vivo durante os jogos do Brasil no Copaço.
+            </p>
+          </div>
+
+          <div className="space-y-1 text-center font-mono">
+            <a
+              href="https://methaenergia.com.br/indicacao/U7603NFG"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full bg-[#ebd152] hover:bg-yellow-500 text-black font-display font-black py-3 px-4 rounded-xl text-xs uppercase block transition-transform hover:scale-[1.01] shadow-lg shadow-soccer-gold/20 font-bold tracking-wider"
+            >
+              🚀 Quero Concorrer e Economizar!
+            </a>
+            <span className="block text-[9px] text-soccer-cream/50 pt-1">
+              methaenergia.com.br/indicacao/U7603NFG
+            </span>
+          </div>
+        </div>
+      )}
 
     </div>
   );

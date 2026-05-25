@@ -40,6 +40,8 @@ export interface Reservation {
   tableNumber: number; // 1-indexed up to respective tablesTotal
   status: ReservationStatus;
   paymentProofUrl?: string; // or text proof info
+  paymentMethod?: "pix" | "pagseguro" | "gratis";
+  paymentId?: string;
   createdAt: string;
   updatedAt: string;
 }

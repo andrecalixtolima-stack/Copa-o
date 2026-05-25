@@ -8,7 +8,8 @@ import { Game, Reservation, BlockedTable } from "../types";
 import { db, handleFirestoreError, OperationType } from "../firebase";
 import { collection, doc, writeBatch, getDocs } from "firebase/firestore";
 import { 
-  X, Info, Phone, User, Users, Clipboard, ExternalLink, Check, AlertTriangle, HelpCircle, ChevronRight 
+  X, Info, Phone, User, Users, Clipboard, ExternalLink, Check, AlertTriangle, HelpCircle, ChevronRight,
+  CreditCard, ShieldCheck, Lock, Sparkles
 } from "lucide-react";
 
 interface ReservationModalProps {
@@ -41,6 +42,16 @@ export default function ReservationModal({
   const [formError, setFormError] = useState("");
   const [copied, setCopied] = useState(false);
   const [createdReservation, setCreatedReservation] = useState<Reservation | null>(null);
+
+  // PagSeguro state management
+  const [paymentOption, setPaymentOption] = useState<"pix" | "pagseguro">("pix");
+  const [cardNumber, setCardNumber] = useState("");
+  const [cardName, setCardName] = useState("");
+  const [cardExpiry, setCardExpiry] = useState("");
+  const [cardCvv, setCardCvv] = useState("");
+  const [installments, setInstallments] = useState("1");
+  const [isPayingCard, setIsPayingCard] = useState(false);
+  const [cardError, setCardError] = useState("");
 
   // Filter occupied tables for this specific game
   const activeReservationsForGame = reservations.filter(
@@ -78,6 +89,127 @@ export default function ReservationModal({
   const calculatePrice = () => {
     if (!game.isBrazilGame) return 0;
     return tableType === "mesa4" ? (game.priceTable4 || 24) : (game.priceTable2 || 12);
+  };
+
+  const handleCardPaymentSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCardError("");
+    
+    if (!createdReservation) {
+      setCardError("Nenhuma reserva vinculada identificada.");
+      return;
+    }
+
+    const cleanCard = cardNumber.replace(/\s+/g, "");
+    if (cleanCard.length < 15 || cleanCard.length > 16) {
+      setCardError("Número do cartão inválido. Insira todos os dígitos.");
+      return;
+    }
+
+    if (!cardName.trim()) {
+      setCardError("Por favor, preencha o nome do titular exatamente como impresso no cartão.");
+      return;
+    }
+
+    if (!cardExpiry.includes("/")) {
+      setCardError("Insira a data de validade no formato MM/AA.");
+      return;
+    }
+
+    if (cardCvv.length < 3 || cardCvv.length > 4) {
+      setCardError("CVV incorreto. São 3 ou 4 dígitos.");
+      return;
+    }
+
+    setIsPayingCard(true);
+
+    try {
+      // Simulate gateway approval timeout
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      const transactionId = "PS_" + Math.random().toString(36).substring(2, 10).toUpperCase();
+
+      const response = await fetch("/api/reservations/confirm-payment", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          reservationId: createdReservation.id,
+          paymentMethod: "pagseguro",
+          paymentId: transactionId
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || "Ocorreu um erro ao comunicar aprovação com o PagSeguro.");
+      }
+
+      const updatedData = await response.json();
+      
+      // Update local reservation state
+      setCreatedReservation(prev => prev ? {
+        ...prev,
+        status: "confirmado",
+        paymentMethod: "pagseguro",
+        paymentId: transactionId
+      } : null);
+
+      setStep("success");
+    } catch (err: any) {
+      setCardError(err.message || "Falha na transação. Verifique seus dados do cartão ou tente novamente.");
+    } finally {
+      setIsPayingCard(false);
+    }
+  };
+
+  const formatCardNumber = (value: string) => {
+    const v = value.replace(/\s+/g, "").replace(/[^0-9]/gi, "");
+    const matches = v.match(/\d{4,16}/g);
+    const match = (matches && matches[0]) || "";
+    const parts = [];
+
+    for (let i = 0, len = match.length; i < len; i += 4) {
+      parts.push(match.substring(i, i + 4));
+    }
+
+    if (parts.length > 0) {
+      return parts.join(" ");
+    } else {
+      return v;
+    }
+  };
+
+  const handleCardNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatCardNumber(e.target.value);
+    if (formatted.length <= 19) {
+      setCardNumber(formatted);
+    }
+  };
+
+  const formatExpiry = (value: string) => {
+    const clean = value.replace(/[^0-9]/g, "");
+    if (clean.length >= 2) {
+      return `${clean.slice(0, 2)}/${clean.slice(2, 4)}`;
+    }
+    return clean;
+  };
+
+  const handleExpiryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatExpiry(e.target.value);
+    if (formatted.length <= 5) {
+      setCardExpiry(formatted);
+    }
+  };
+
+  const getCardBrand = (num: string) => {
+    const clean = num.replace(/\s+/g, "");
+    if (clean.startsWith("4")) return "visa";
+    if (clean.startsWith("5")) return "mastercard";
+    if (clean.startsWith("3")) return "amex";
+    if (clean.startsWith("6")) return "elo";
+    return "pagseguro";
   };
 
   const handleSubmitDetails = async (e: React.FormEvent) => {
@@ -714,8 +846,8 @@ export default function ReservationModal({
               </div>
 
               {/* PIX Key and Value Card */}
-              <div className="bg-[#03150b] border border-soccer-field p-6 rounded-2xl space-y-4 shadow-xl text-soccer-cream animate-none">
-                <div className="text-left bg-soccer-dark/60 p-4 rounded-xl border border-soccer-field/50">
+              <div className="bg-[#03150b] border border-soccer-field p-6 rounded-2xl space-y-4 shadow-xl text-soccer-cream text-left">
+                <div className="bg-soccer-dark/60 p-4 rounded-xl border border-soccer-field/50">
                   <span className="block text-[10px] font-mono text-soccer-gold uppercase font-bold">Chave PIX (CNPJ)</span>
                   <div className="flex items-center justify-between mt-1">
                     <span className="font-mono text-sm text-soccer-cream font-semibold">48558675000187</span>
@@ -739,12 +871,12 @@ export default function ReservationModal({
                   </div>
                 </div>
 
-                <div className="text-left bg-[#03150b] p-4 rounded-xl border border-soccer-field/55 flex justify-between items-center">
+                <div className="bg-[#03150b] p-4 rounded-xl border border-soccer-field/55 flex justify-between items-center font-mono text-xs">
                   <div>
-                    <span className="block text-[10px] font-mono text-soccer-gold uppercase font-bold">Valor do Pix</span>
-                    <span className="font-display text-lg text-soccer-cream font-extrabold font-mono">R$ {calculatePrice()},00</span>
+                    <span className="block text-[10px] uppercase font-bold text-soccer-gold">Valor do Pix</span>
+                    <span className="font-display text-lg text-soccer-cream font-extrabold">R$ {calculatePrice()},00</span>
                   </div>
-                  <div className="text-right text-[10px] font-mono text-soccer-cream/50">
+                  <div className="text-right text-[10px] text-soccer-cream/50">
                     Mesa #{selectedTableNumber}<br />
                     Para {paxCount} pessoas
                   </div>
@@ -823,6 +955,20 @@ export default function ReservationModal({
                     <span className="text-soccer-cream/50">Convidado Principal:</span>
                     <span className="text-soccer-cream font-semibold">{createdReservation.clientName}</span>
                   </div>
+                  {createdReservation.paymentMethod && (
+                    <div className="flex justify-between border-t border-soccer-field/30 pt-2">
+                      <span className="text-soccer-cream/50">Pagamento:</span>
+                      <span className="text-soccer-gold font-bold uppercase text-[10px]">
+                        {createdReservation.paymentMethod === "pagseguro" ? "Cartão (PagSeguro)" : "PIX"}
+                      </span>
+                    </div>
+                  )}
+                  {createdReservation.paymentId && (
+                    <div className="flex justify-between">
+                      <span className="text-soccer-cream/50">ID Transação:</span>
+                      <span className="text-soccer-cream/80 font-mono text-[10px]">{createdReservation.paymentId}</span>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -849,6 +995,59 @@ export default function ReservationModal({
                     </p>
                   </>
                 )}
+              </div>
+
+              {/* METHA ENERGIA HIGHLY CHANCEFUL PROMO BLOCK */}
+              <div className="bg-gradient-to-br from-[#0c2f18] to-[#041a0d] border-2 border-soccer-gold/70 rounded-2xl p-5 text-left space-y-4 shadow-xl relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-30 bg-soccer-gold/5 blur-3xl rounded-full" />
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">⚡</span>
+                  <div>
+                    <h4 className="text-xs font-mono text-soccer-gold font-bold uppercase tracking-wider">PROMOÇÃO ESPECIAL PARCEIRO COPAÇO</h4>
+                    <span className="text-sm font-display font-black text-white uppercase block leading-tight">Ganhe Desconto na Luz & Prêmios! 🇧🇷</span>
+                  </div>
+                </div>
+
+                <p className="text-xs text-soccer-cream/95 font-sans leading-relaxed">
+                  Levando sua conta de energia para a <strong className="text-soccer-gold">Metha Energia</strong> você garante <strong className="text-emerald-400">até 15% de desconto</strong> na sua conta de luz e ainda concorre a prêmios especiais durante os jogos do Brasil!
+                </p>
+
+                <div className="bg-[#03140a] p-3 rounded-xl border border-soccer-field/40 space-y-2 text-xs">
+                  <span className="font-bold text-soccer-gold flex items-center gap-1">
+                    🎁 Prêmios dos sorteios:
+                  </span>
+                  <ul className="space-y-1.5 text-soccer-cream/90 font-sans pl-2">
+                    <li className="flex items-start gap-2">
+                      <span className="text-[10px] text-soccer-gold mt-0.5">•</span>
+                      <span>Camisas personalizadas da torcida</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-[10px] text-soccer-gold mt-0.5">•</span>
+                      <span>Até 6 meses de conta de energia <strong className="text-emerald-400">GRÁTIS</strong></span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-[10px] text-soccer-gold mt-0.5">•</span>
+                      <span>A sua conta <strong className="text-emerald-400">ZERADA</strong></span>
+                    </li>
+                  </ul>
+                  <p className="text-[10px] text-soccer-cream/60 font-mono italic pt-1">
+                    Os sorteios serão realizados ao vivo durante os jogos do Brasil no Copaço.
+                  </p>
+                </div>
+
+                <div className="space-y-2 pt-1 text-center">
+                  <a
+                    href="https://methaenergia.com.br/indicacao/U7603NFG"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full bg-[#ebd152] hover:bg-yellow-500 font-bold text-black py-3 rounded-xl text-xs uppercase text-center block transition-transform hover:scale-[1.01] shadow-lg shadow-soccer-gold/20 font-display animate-pulse"
+                  >
+                    👉 Faça seu cadastro aqui!
+                  </a>
+                  <span className="block font-mono text-[9px] text-soccer-cream/60">
+                    methaenergia.com.br/indicacao/U7603NFG
+                  </span>
+                </div>
               </div>
 
               <div className="pt-4">
