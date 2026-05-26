@@ -46,20 +46,9 @@ export default function App() {
   const [selectedGame, setSelectedGame] = useState<Game | null>(null);
   const [gameToEdit, setGameToEdit] = useState<Game | null>(null);
   
-  const [showMethaBanner, setShowMethaBanner] = useState(() => {
-    try {
-      return !localStorage.getItem("dismissed_metha_banner");
-    } catch {
-      return true;
-    }
-  });
+  const [showMethaBanner, setShowMethaBanner] = useState(true);
 
   const handleDismissMethaBanner = () => {
-    try {
-      localStorage.setItem("dismissed_metha_banner", "true");
-    } catch (e) {
-      console.warn("localStorage is not available.");
-    }
     setShowMethaBanner(false);
   };
 
@@ -372,13 +361,7 @@ export default function App() {
             </p>
           </div>
 
-          {/* Highlight text requested */}
-          <div className="inline-block bg-soccer-field/40 border border-soccer-field/60 px-6 py-3 rounded-2xl shadow-lg">
-            <div className="flex items-center justify-center gap-2 text-soccer-gold font-display font-bold text-sm sm:text-base tracking-tight">
-              <Tv className="w-5 h-5 text-soccer-gold shrink-0" />
-              <span>{homepageTexts.telaoBannerText}</span>
-            </div>
-          </div>
+
 
         </section>
 

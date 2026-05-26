@@ -163,13 +163,7 @@ export default function Header({ isAdminMode, onToggleAdminMode, homepageTexts, 
             </div>
           </div>
 
-          {/* Destaque Telão Info */}
-          <div className="hidden md:flex items-center gap-2 bg-soccer-field/30 px-4 py-2 rounded-full border border-soccer-field/20 transition-all">
-            <Ticket className="w-4 h-4 text-soccer-gold animate-pulse" />
-            <span className="text-xs text-soccer-cream/90 font-medium font-sans">
-              Toda reserva garante acesso ao telão principal!
-            </span>
-          </div>
+
 
           {/* Realtime Synchronized Badge */}
           <div className="hidden sm:flex items-center gap-2 bg-soccer-field/30 border border-soccer-field/20 px-3 py-1.5 rounded-full text-soccer-cream font-mono text-[10px] uppercase tracking-widest">
