@@ -13,7 +13,7 @@ import ReservationModal from "./components/ReservationModal";
 import AdminPanel from "./components/AdminPanel";
 import LogoImage from "./components/LogoImage";
 import { 
-  Tv, Music, Beer, Trophy, Gift, Users2, Sparkles, HelpCircle, Star, Sparkle, RefreshCw, Eye, X, ExternalLink
+  Tv, Music, Beer, Trophy, Gift, Users2, Sparkles, HelpCircle, Star, Sparkle, RefreshCw, Eye, X, ExternalLink, MessageCircle
 } from "lucide-react";
 
 export default function App() {
@@ -223,8 +223,8 @@ export default function App() {
           isBrazilGame: true,
           tablesTotal4: 30,
           tablesTotal2: 3,
-          priceTable4: 24,
-          priceTable2: 12,
+          priceTable4: 28,
+          priceTable2: 14,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         },
@@ -251,8 +251,8 @@ export default function App() {
           isBrazilGame: true,
           tablesTotal4: 30,
           tablesTotal2: 3,
-          priceTable4: 24,
-          priceTable2: 12,
+          priceTable4: 28,
+          priceTable2: 14,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         }
@@ -640,6 +640,18 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* FLOATING WHATSAPP SUPPORT BUTTON (ALL PAGES/VIEWS) */}
+      <a
+        href="https://wa.me/5531975099398?text=Olá,%20gostaria%20de%20tirar%20uma%20dúvida%20sobre%20as%20reservas%20do%20Copaço!"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="fixed bottom-6 left-6 z-[60] flex items-center gap-2 bg-gradient-to-r from-emerald-600 to-green-700 hover:from-emerald-500 hover:to-green-600 text-white px-4 py-3 rounded-full shadow-2xl hover:scale-105 active:scale-95 transition-all duration-300 border border-emerald-400/30 select-none group font-display"
+        title="Dúvidas? Fale conosco no WhatsApp"
+      >
+        <MessageCircle className="w-5 h-5 fill-white text-emerald-600 group-hover:text-emerald-500 transition-colors" />
+        <span className="text-xs font-black uppercase tracking-wider">Dúvidas? Fale Conosco</span>
+      </a>
 
     </div>
   );

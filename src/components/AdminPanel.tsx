@@ -356,8 +356,8 @@ export default function AdminPanel({
   const [formIsBrazil, setFormIsBrazil] = useState(false);
   const [formTables4, setFormTables4] = useState(30);
   const [formTables2, setFormTables2] = useState(3);
-  const [formPrice4, setFormPrice4] = useState(24);
-  const [formPrice2, setFormPrice2] = useState(12);
+  const [formPrice4, setFormPrice4] = useState(28);
+  const [formPrice2, setFormPrice2] = useState(14);
 
   // Blocking / Manual Booking states
   const [selectedGameId, setSelectedGameId] = useState("");
@@ -484,8 +484,8 @@ export default function AdminPanel({
       if (r.isBrazilGame) {
         const game = games.find(g => g.id === r.gameId);
         const price = r.tableType === "mesa4" 
-          ? (game?.priceTable4 || 24) 
-          : (game?.priceTable2 || 12);
+          ? (game?.priceTable4 || 28) 
+          : (game?.priceTable2 || 14);
         
         faturamentoPrevisto += price;
         if (r.status === "confirmado" || r.status === "ativa") {
@@ -526,8 +526,8 @@ export default function AdminPanel({
     setFormIsBrazil(false);
     setFormTables4(30);
     setFormTables2(3);
-    setFormPrice4(24);
-    setFormPrice2(12);
+    setFormPrice4(28);
+    setFormPrice2(14);
     setShowGameForm(true);
   };
 

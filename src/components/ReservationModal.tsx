@@ -88,7 +88,7 @@ export default function ReservationModal({
 
   const calculatePrice = () => {
     if (!game.isBrazilGame) return 0;
-    return tableType === "mesa4" ? (game.priceTable4 || 24) : (game.priceTable2 || 12);
+    return tableType === "mesa4" ? (game.priceTable4 || 28) : (game.priceTable2 || 14);
   };
 
   const handleCardPaymentSubmit = async (e: React.FormEvent) => {
@@ -592,8 +592,8 @@ export default function ReservationModal({
                           <span className="text-xs font-display font-medium text-soccer-cream/70">Custo por Pessoa:</span>
                           <span className="text-lg font-display font-black text-soccer-gold font-mono animate-pulse">
                             {tableType === "mesa4" 
-                              ? `4x R$ ${Math.round((game.priceTable4 || 24) / 4)} por pessoa` 
-                              : `2x R$ ${Math.round((game.priceTable2 || 12) / 2)} por pessoa`}
+                              ? `4x R$ ${Math.round((game.priceTable4 || 28) / 4)} por pessoa` 
+                              : `2x R$ ${Math.round((game.priceTable2 || 14) / 2)} por pessoa`}
                           </span>
                         </div>
                         {game.isBrazilGame && (
@@ -703,7 +703,7 @@ export default function ReservationModal({
                         <div className="text-[11px] font-mono text-soccer-cream/80 uppercase mb-2 flex items-center justify-between">
                           <span>MESA PARA 4 PESSOAS (30 Mesas Disponíveis)</span>
                           {game.isBrazilGame && (
-                            <span className="text-soccer-gold font-bold">4x R$ {Math.round((game.priceTable4 || 24) / 4)}/pessoa</span>
+                            <span className="text-soccer-gold font-bold">4x R$ {Math.round((game.priceTable4 || 28) / 4)}/pessoa</span>
                           )}
                         </div>
                         <div className="grid grid-cols-5 sm:grid-cols-6 lg:grid-cols-6 gap-3 p-4 bg-[#041a0d] rounded-2xl border border-soccer-field/50 max-h-[300px] overflow-y-auto">
@@ -745,7 +745,7 @@ export default function ReservationModal({
                         <div className="text-[11px] font-mono text-soccer-cream/80 uppercase mb-2 flex items-center justify-between">
                           <span>MESA PARA 2 PESSOAS (3 Mesas Disponíveis)</span>
                           {game.isBrazilGame && (
-                            <span className="text-soccer-gold font-bold">2x R$ {Math.round((game.priceTable2 || 12) / 2)}/pessoa</span>
+                            <span className="text-soccer-gold font-bold">2x R$ {Math.round((game.priceTable2 || 14) / 2)}/pessoa</span>
                           )}
                         </div>
                         <div className="grid grid-cols-3 gap-4 p-4 bg-[#041a0d] rounded-2xl border border-soccer-field/50">
