@@ -668,8 +668,9 @@ export default function ReservationModal({
                         <div className="flex gap-2">
                           <span className="text-base shrink-0">🎈</span>
                           <div>
-                            <strong className="text-emerald-400 block font-bold mb-0.5 uppercase tracking-wide">Para Aniversários & Grupos:</strong>
-                            Se preferir, cada um pode comprar/pagar o seu individualmente no dia do evento por apenas <strong className="text-white underline">R$ 10,00 por convidado</strong> separadamente!
+                            <strong className="text-emerald-400 block font-bold mb-0.5 uppercase tracking-wide">AVISO DE PORTARIA & ANIVERSÁRIOS:</strong>
+                            No dia do evento teremos venda de ingressos individuais na porta por <strong className="text-white">R$ 10,00 por pessoa</strong>.
+                            <span className="block mt-1">🎂 <strong className="text-soccer-gold">Aniversariantes:</strong> Liberamos entrada <strong className="text-white">OFF (Gratuita)</strong> para o aniversariante! Seus convidados pagam normalmente na portaria ou você pode reservar mesa antecipadamente pagando 6 reais por pessoa.</span>
                           </div>
                         </div>
                       </div>
