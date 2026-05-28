@@ -275,6 +275,13 @@ export default function ReservationModal({
     }
 
     // Double check rules on submission
+    const currentChairsCountForGame = activeReservationsForGame.reduce((acc, r) => acc + (r.paxCount || 0), 0);
+    const addedChairs = extraSeat ? (paxCount + 1) : paxCount;
+    if (currentChairsCountForGame + addedChairs > 124) {
+      setFormError(`Limite de ocupação de cadeiras atingido. Restam apenas ${124 - currentChairsCountForGame} cadeiras disponíveis para hoje.`);
+      return;
+    }
+
     if (paxCount > 2 && tableType === "mesa2") {
       setFormError("Reservas de 2 lugares comportam no máximo 2 pessoas.");
       return;

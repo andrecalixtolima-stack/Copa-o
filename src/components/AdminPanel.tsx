@@ -371,6 +371,77 @@ export default function AdminPanel({
   const [reservationSubTab, setReservationSubTab] = useState<"active" | "trash">("active");
   const [groupSameClient, setGroupSameClient] = useState(false);
 
+  // Reservation Edit states
+  const [editingRes, setEditingRes] = useState<Reservation | null>(null);
+  const [editResName, setEditResName] = useState("");
+  const [editResPhone, setEditResPhone] = useState("");
+  const [editResPax, setEditResPax] = useState<number>(4);
+  const [editResExtra, setEditResExtra] = useState(false);
+  const [isSavingResEdit, setIsSavingResEdit] = useState(false);
+  const [resEditError, setResEditError] = useState("");
+
+  const handleOpenEditRes = (res: Reservation) => {
+    setEditingRes(res);
+    setEditResName(res.clientName || "");
+    setEditResPhone(res.clientPhone || "");
+    setEditResPax(res.paxCount || 4);
+    setEditResExtra(!!res.hasExtraSeat);
+    setResEditError("");
+  };
+
+  const handleSaveResEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingRes) return;
+    if (!editResName.trim()) {
+      setResEditError("O nome do convidado é obrigatório.");
+      return;
+    }
+    if (!editResPhone.trim()) {
+      setResEditError("O telefone é obrigatório.");
+      return;
+    }
+
+    setIsSavingResEdit(true);
+    setResEditError("");
+
+    try {
+      const response = await fetch("/api/reservations/update-details", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-uid": auth.currentUser?.uid || "local_bypass_admin",
+          "x-admin-email": auth.currentUser?.email || "andrecalixtolima@gmail.com"
+        },
+        body: JSON.stringify({
+          reservationId: editingRes.id,
+          clientName: editResName,
+          clientPhone: editResPhone,
+          paxCount: Number(editResPax),
+          hasExtraSeat: editResExtra
+        })
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        let errMsg = text;
+        try {
+          const json = JSON.parse(text);
+          errMsg = json.error || errMsg;
+        } catch {}
+        throw new Error(errMsg || "Erro ao salvar dados.");
+      }
+
+      showFeedback("Reserva editada com sucesso!");
+      setEditingRes(null);
+      onRefresh();
+    } catch (err: any) {
+      console.error("Erro ao salvar dados da reserva:", err);
+      setResEditError(err.message || "Erro de conexão ao editar.");
+    } finally {
+      setIsSavingResEdit(false);
+    }
+  };
+
   // Helper to normalize phone
   const normalizePhone = (phone: string | undefined | null) => {
     if (!phone) return "";
@@ -705,7 +776,7 @@ Esperamos vocês!`;
     setFormImageUrl("");
     setFormIsBrazil(false);
     setFormTables4(30);
-    setFormTables2(3);
+    setFormTables2(2);
     setFormPrice4(24);
     setFormPrice2(12);
     setShowGameForm(true);
@@ -2189,14 +2260,24 @@ Esperamos vocês!`;
                           )}
 
                           {/* Action button to direct WhatsApp notification */}
-                          <button
-                            type="button"
-                            onClick={() => handleSendWhatsApp(res)}
-                            className="mt-2 inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 hover:scale-[1.02] text-white font-mono font-black text-[9px] uppercase tracking-wider px-2 py-1 rounded transition-all cursor-pointer shadow shadow-emerald-950/20 active:translate-y-px"
-                          >
-                            <MessageSquare className="w-3 h-3 shrink-0" />
-                            <span>WhatsApp 💚</span>
-                          </button>
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            <button
+                              type="button"
+                              onClick={() => handleSendWhatsApp(res)}
+                              className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 hover:scale-[1.02] text-white font-mono font-black text-[9px] uppercase tracking-wider px-2.5 py-1 rounded transition-all cursor-pointer shadow shadow-emerald-950/20 active:translate-y-px"
+                            >
+                              <MessageSquare className="w-3 h-3 shrink-0" />
+                              <span>WhatsApp 💚</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditRes(res)}
+                              className="inline-flex items-center gap-1.5 bg-soccer-gold hover:bg-yellow-400 hover:scale-[1.02] text-soccer-dark font-mono font-black text-[9px] uppercase tracking-wider px-2.5 py-1 rounded transition-all cursor-pointer shadow shadow-yellow-950/20 active:translate-y-px"
+                            >
+                              <Edit2 className="w-3 h-3 shrink-0" />
+                              <span>Editar ✏️</span>
+                            </button>
+                          </div>
                         </td>
 
                         <td className="px-4 py-4 truncate max-w-[150px]">
@@ -3310,6 +3391,121 @@ Esperamos vocês!`;
               </div>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: EDIT RESERVATION DETAILS */}
+      {editingRes && (
+        <div id="edit_res_modal_backdrop" className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-gradient-to-b from-[#052912] to-[#03150b] border-2 border-soccer-gold/60 rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl relative animate-fade-in text-soccer-cream">
+            
+            {/* Header decoration */}
+            <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-green-500 via-soccer-gold to-soccer-orange" />
+
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-5">
+                <div className="flex items-center gap-2">
+                  <Edit2 className="w-5 h-5 text-soccer-gold" />
+                  <h3 className="font-display font-extrabold text-base uppercase tracking-tight">Editar Detalhes da Reserva</h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditingRes(null)}
+                  className="text-soccer-cream/50 hover:text-soccer-cream p-1 bg-white/5 hover:bg-white/10 rounded-full transition-all cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="bg-[#03150b] p-3 rounded-xl border border-soccer-field/40 text-[11px] font-mono text-soccer-gold/90 mb-6 flex flex-col gap-1">
+                <div>⚽ JOGO: {editingRes.gameName}</div>
+                <div>🪑 TIPO DE MESA: {editingRes.tableType === "mesa4" ? "Mesa para 4 (M4)" : "Mesa para 2 (M2)"} #{editingRes.tableNumber}</div>
+                <div>🆔 ID DA RESERVA: {editingRes.id.toUpperCase()}</div>
+              </div>
+
+              <form onSubmit={handleSaveResEdit} className="space-y-4">
+                <div>
+                  <label className="block text-[10px] font-mono text-soccer-gold uppercase mb-1">Nome do Convidado / Titular</label>
+                  <input
+                    type="text"
+                    required
+                    value={editResName}
+                    onChange={(e) => setEditResName(e.target.value)}
+                    className="w-full bg-[#051c0f] border border-soccer-field rounded-xl py-2.5 px-3 text-xs text-soccer-cream outline-none focus:border-soccer-gold"
+                    placeholder="Ex: André Calixto"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-mono text-soccer-gold uppercase mb-1">Telefone / WhatsApp</label>
+                  <input
+                    type="text"
+                    required
+                    value={editResPhone}
+                    onChange={(e) => setEditResPhone(e.target.value)}
+                    className="w-full bg-[#051c0f] border border-soccer-field rounded-xl py-2.5 px-3 text-xs text-soccer-cream outline-none focus:border-soccer-gold"
+                    placeholder="Ex: 31975099398"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[10px] font-mono text-soccer-gold uppercase mb-1">Número de Cadeiras (Pax)</label>
+                    <select
+                      value={editResPax}
+                      onChange={(e) => setEditResPax(Number(e.target.value))}
+                      className="w-full bg-[#051c0f] border border-soccer-field rounded-xl py-2 px-3 text-xs text-soccer-cream outline-none focus:border-soccer-gold cursor-pointer"
+                    >
+                      <option value="1">1 Cadeira</option>
+                      <option value="2">2 Cadeiras</option>
+                      <option value="3">3 Cadeiras</option>
+                      <option value="4">4 Cadeiras</option>
+                      <option value="5">5 Cadeiras</option>
+                      <option value="6">6 Cadeiras</option>
+                      <option value="7">7 Cadeiras</option>
+                      <option value="8">8 Cadeiras</option>
+                    </select>
+                  </div>
+
+                  <div className="flex items-end pb-1.5">
+                    <label className="flex items-center gap-2 bg-[#051c0f] border border-soccer-field rounded-xl py-2 px-3 text-xs text-soccer-cream outline-none cursor-pointer w-full hover:border-soccer-gold transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={editResExtra}
+                        onChange={(e) => setEditResExtra(e.target.checked)}
+                        className="w-4 h-4 accent-soccer-field rounded cursor-pointer"
+                      />
+                      <span className="text-[10px] font-mono uppercase text-soccer-gold">Cadeira Extra (+1)</span>
+                    </label>
+                  </div>
+                </div>
+
+                {resEditError && (
+                  <div className="bg-red-950/50 border border-red-700/50 rounded-xl p-3 flex items-start gap-2 text-xs text-red-200">
+                    <AlertOctagon className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                    <span>{resEditError}</span>
+                  </div>
+                )}
+
+                <div className="flex gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditingRes(null)}
+                    className="w-1/3 py-2.5 bg-white/5 hover:bg-white/10 text-soccer-cream text-xs font-semibold rounded-xl transition-all cursor-pointer text-center"
+                  >
+                    Voltar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSavingResEdit}
+                    className="flex-1 py-2.5 bg-gradient-to-r from-soccer-gold to-yellow-500 hover:from-yellow-500 hover:to-soccer-orange text-soccer-dark text-xs font-bold rounded-xl transition-all cursor-pointer shadow-lg hover:scale-[1.01]"
+                  >
+                    {isSavingResEdit ? "Salvando..." : "Salvar Alterações 💾"}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         </div>
       )}

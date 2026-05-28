@@ -46,17 +46,24 @@ export default function MatchList({
     const avail2 = Math.max(0, game.tablesTotal2 - reserved2 - blocked2);
     const totalAvail = avail4 + avail2;
 
-    const isSoldOut = totalAvail === 0;
+    // Sum of chairs for active reservations
+    const totalChairsReserved = activeReservations.reduce((acc, r) => acc + (r.paxCount || 0), 0);
+
+    // Day blocks automatically if available tables <= 0 OR total chairs >= 124
+    const isSoldOut = totalAvail === 0 || totalChairsReserved >= 124;
+
+    // Calculate percentage based on tables or chairs, whichever is higher, but capped at 100%
+    const percentByTables = ((reserved4 + reserved2 + blocked4 + blocked2) / (game.tablesTotal4 + game.tablesTotal2)) * 100;
+    const percentByChairs = (totalChairsReserved / 124) * 100;
+    const percentReserved = Math.min(100, Math.round(Math.max(percentByTables, percentByChairs)));
 
     return {
       avail4,
       avail2,
       totalAvail,
+      totalChairsReserved,
       isSoldOut,
-      percentReserved: Math.round(
-        ((reserved4 + reserved2 + blocked4 + blocked2) / 
-        (game.tablesTotal4 + game.tablesTotal2)) * 100
-      )
+      percentReserved
     };
   };
 
@@ -272,9 +279,10 @@ export default function MatchList({
                           style={{ width: `${stats.percentReserved}%` }}
                         />
                       </div>
-                      <p className="text-[10px] font-mono text-soccer-gold font-bold mt-1.5 italic">
-                        Restam {stats.totalAvail} mesas de {game.tablesTotal4 + game.tablesTotal2} totais
-                      </p>
+                      <div className="flex justify-between text-[10px] font-mono mt-1.5 font-bold">
+                        <span className="text-soccer-gold">Restam {stats.totalAvail} mesas de {game.tablesTotal4 + game.tablesTotal2} totais</span>
+                        <span className="text-soccer-cream/80">({stats.totalChairsReserved}/124 Cadeiras Reservadas)</span>
+                      </div>
                     </div>
 
                     {/* Operational Action Buttons */}

@@ -198,6 +198,25 @@ app.post("/api/reservations/create", createRateLimiter(10, 5 * 60 * 1000), async
       return res.status(400).json({ error: "Esta mesa está bloqueada pela administração." });
     }
 
+    // 1.5. Validate maximum day capacity of 124 chairs
+    const existingReservationsSnap = await adminDb.collection("reservations")
+      .where("gameId", "==", gameId)
+      .get();
+      
+    let totalChairs = 0;
+    existingReservationsSnap.forEach(d => {
+      const r = d.data();
+      if (r.status !== "cancelado" && r.status !== "liberada automaticamente") {
+        totalChairs += Number(r.paxCount || 0);
+      }
+    });
+
+    if (totalChairs + Number(paxCount) > 124) {
+      return res.status(400).json({ 
+        error: `Infelizmente, a capacidade máxima do dia (124 cadeiras) foi atingida. Já existem ${totalChairs} cadeiras reservadas. Não é possível adicionar mais ${paxCount} cadeiras.` 
+      });
+    }
+
     // 2. Construct payloads and write atomically
     const resId = adminDb.collection("reservations").doc().id;
     
@@ -790,6 +809,88 @@ app.post("/api/reservations/update-status", adminGuard, async (req, res) => {
     });
 
     return res.json({ success: true, message: `Status alterado com sucesso para ${nextStatus}` });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// API Route: Admin - Update Reservation Details (Name, Phone, Pax, Extra Seat)
+app.post("/api/reservations/update-details", adminGuard, async (req, res) => {
+  try {
+    const { reservationId, clientName, clientPhone, paxCount, hasExtraSeat } = req.body;
+    const performerUid = req.headers["x-admin-uid"] as string;
+    const performerEmail = req.headers["x-admin-email"] as string;
+
+    if (!reservationId || !clientName || !clientPhone) {
+      return res.status(400).json({ error: "Faltando dados obrigatórios." });
+    }
+
+    const resRef = adminDb.collection("reservations").doc(reservationId);
+    const resSnap = await resRef.get();
+
+    if (!resSnap.exists) {
+      return res.status(404).json({ error: "Reserva não encontrada." });
+    }
+
+    const resData = resSnap.data()!;
+    const newPaxCount = Number(paxCount);
+
+    // Dynamic verification of 124 limit
+    const existingSnap = await adminDb.collection("reservations")
+      .where("gameId", "==", resData.gameId)
+      .get();
+
+    let totalChairsOther = 0;
+    existingSnap.forEach(d => {
+      if (d.id !== reservationId) {
+        const r = d.data();
+        if (r.status !== "cancelado" && r.status !== "liberada automaticamente") {
+          totalChairsOther += Number(r.paxCount || 0);
+        }
+      }
+    });
+
+    if (totalChairsOther + newPaxCount > 124) {
+      return res.status(400).json({
+        error: `A alteração excede o limite do dia (124 cadeiras). Já existem ${totalChairsOther} cadeiras de outros convidados. Total ficaria em ${totalChairsOther + newPaxCount} cadeiras.`
+      });
+    }
+
+    const timestamp = new Date().toISOString();
+    await resRef.update({
+      clientName: clientName.trim(),
+      clientPhone: clientPhone.trim(),
+      paxCount: newPaxCount,
+      hasExtraSeat: !!hasExtraSeat,
+      updatedAt: timestamp
+    });
+
+    // Also update availability details in DB if exists
+    const availabilityId = `${resData.gameId}_${resData.tableType}_${resData.tableNumber}`;
+    const availRef = adminDb.collection("availability").doc(availabilityId);
+    const availSnap = await availRef.get();
+    if (availSnap.exists) {
+      await availRef.update({
+        clientName: clientName.trim(),
+        clientPhone: clientPhone.trim(),
+        paxCount: newPaxCount,
+        hasExtraSeat: !!hasExtraSeat,
+        updatedAt: timestamp
+      });
+    }
+
+    // Write Audit Log
+    const logId = adminDb.collection("auditLogs").doc().id;
+    await adminDb.collection("auditLogs").doc(logId).set({
+      id: logId,
+      action: "update_details",
+      details: `${performerEmail} editou detalhes da reserva de ${resData.clientName} (Mesa #${resData.tableNumber}). Novo nome: ${clientName}, Novo fone: ${clientPhone}, Pax: ${newPaxCount}, Extra: ${hasExtraSeat}.`,
+      performedBy: performerUid,
+      performedByEmail: performerEmail,
+      timestamp: timestamp
+    });
+
+    return res.json({ success: true, message: "Reserva atualizada com sucesso." });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
