@@ -12,7 +12,7 @@ import {
   collection, addDoc, updateDoc, deleteDoc, doc, writeBatch, setDoc
 } from "firebase/firestore";
 import { 
-  Calendar, Clock, DollarSign, Users, Trash2, Edit2, Shield, Plus, X, Check, Eye, HelpCircle, AlertOctagon, RefreshCw, Layers, PhoneCall, CheckCircle2, Ban, Download, Upload, Database, FileSpreadsheet
+  Calendar, Clock, DollarSign, Users, Trash2, Edit2, Shield, Plus, X, Check, Eye, HelpCircle, AlertOctagon, RefreshCw, Layers, PhoneCall, CheckCircle2, Ban, Download, Upload, Database, FileSpreadsheet, MessageSquare
 } from "lucide-react";
 import { auth } from "../firebase";
 
@@ -366,6 +366,172 @@ export default function AdminPanel({
   const [blockTableNumber, setBlockTableNumber] = useState<number | "">("");
   const [manualClientName, setManualClientName] = useState("");
   const [manualClientPhone, setManualClientPhone] = useState("");
+
+  // Reservations filtering, sub-tab (Lixeira) and grouping states
+  const [reservationSubTab, setReservationSubTab] = useState<"active" | "trash">("active");
+  const [groupSameClient, setGroupSameClient] = useState(false);
+
+  // Helper to normalize phone
+  const normalizePhone = (phone: string) => {
+    let num = phone.replace(/\D/g, "");
+    if ((num.length === 10 || num.length === 11) && !num.startsWith("55")) {
+      num = "55" + num;
+    }
+    return num;
+  };
+
+  const handleSendWhatsApp = (res: Reservation) => {
+    const phone = normalizePhone(res.clientPhone);
+    const clientName = res.clientName;
+    const matchName = res.gameName;
+    const tType = res.tableType === "mesa4" ? "Mesa para 4 pessoas" : "Mesa para 2 pessoas";
+    const numExtra = res.hasExtraSeat ? " (+1 Cadeira/Ingresso Extra)" : "";
+    const tableNum = res.tableNumber;
+    const numPessoas = res.paxCount;
+    
+    const resInfo = `*DADOS DA RESERVA*\n👤 Cliente: ${clientName}\n🏟️ Jogo: ${matchName}\n🪑 Tipo: ${tType}${numExtra}\n🔢 Mesa #: ${tableNum}\n👥 Qtd Pessoas: ${numPessoas} pessoas\n\n`;
+
+    const textMsg = `${resInfo}Sua mesa está garantida! 💚
+
+Importante: as mesas não seguirão um mapeamento pré-definido. A ocupação será feita por ordem de chegada, então recomendamos chegar cedo para escolher o melhor lugar 😉
+
+Caso algum amigo resolva colar de última hora, teremos venda na porta por R$10 por pessoa.
+
+Além da transmissão dos jogos, vai rolar:
+🎧 Set de DJs
+🎁 Sorteios antes, durante e depois do jogo
+
+⚡ E atenção: em todos os jogos teremos sorteio de 6 meses grátis de energia com a Metha Energia.
+
+Para participar, faça seu cadastro no link abaixo no dia do evento:
+methaenergia.com.br/indicacao/U7603NFG
+
+Esperamos vocês!`;
+
+    const url = `https://wa.me/${phone}?text=${encodeURIComponent(textMsg)}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
+
+  const handleSendWhatsAppGroup = (group: any) => {
+    const phone = normalizePhone(group.clientPhone);
+    const clientName = group.clientName;
+    const matchName = group.gameName;
+    const tables = group.tablesDesc;
+    const totalPax = group.totalPax;
+    const hasExtra = group.hasExtraSeat;
+
+    const extraLabel = hasExtra ? " (+ Cadeira Extra inclusa)" : "";
+
+    const resInfo = `*DADOS DAS RESERVAS*\n👤 Cliente: ${clientName}\n🏟️ Jogo: ${matchName}\n🪑 Mesas Reservadas: ${tables}${extraLabel}\n👥 Total de Pessoas: ${totalPax} pessoas\n\n`;
+
+    const textMsg = `${resInfo}Sua mesa está garantida! 💚
+
+Importante: as mesas não seguirão um mapeamento pré-definido. A ocupação será feita por ordem de chegada, então recomendamos chegar cedo para escolher o melhor lugar 😉
+
+Caso algum amigo resolva colar de última hora, teremos venda na porta por R$10 por pessoa.
+
+Além da transmissão dos jogos, vai rolar:
+🎧 Set de DJs
+🎁 Sorteios antes, durante e depois do jogo
+
+⚡ E atenção: em todos os jogos teremos sorteio de 6 meses grátis de energia com a Metha Energia.
+
+Para participar, faça seu cadastro no link abaixo no dia do evento:
+methaenergia.com.br/indicacao/U7603NFG
+
+Esperamos vocês!`;
+
+    const url = `https://wa.me/${phone}?text=${encodeURIComponent(textMsg)}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
+
+  const getClientAggregation = (phone: string, activeOnly: boolean = true) => {
+    const normPhone = phone.replace(/\D/g, "");
+    const occurrences = reservations.filter(r => {
+      const isCancelled = r.status === "cancelado" || r.status === "liberada automaticamente";
+      if (activeOnly && isCancelled) return false;
+      return r.clientPhone.replace(/\D/g, "") === normPhone;
+    });
+    
+    const totalTables = occurrences.length;
+    const totalPax = occurrences.reduce((sum, r) => sum + r.paxCount, 0);
+    
+    return {
+      totalTables,
+      totalPax,
+      occurrences
+    };
+  };
+
+  const groupReservationsList = (list: Reservation[]): any[] => {
+    const groups: { [key: string]: Reservation[] } = {};
+    
+    list.forEach(r => {
+      const phoneKey = r.clientPhone.replace(/\D/g, "");
+      const key = `${r.gameId}_${phoneKey}`;
+      if (!groups[key]) {
+        groups[key] = [];
+      }
+      groups[key].push(r);
+    });
+
+    const grouped = Object.values(groups).map(matchingRes => {
+      const sortedMatching = [...matchingRes].sort((a, b) => a.tableNumber - b.tableNumber);
+      const prim = sortedMatching[0];
+      const totalPax = sortedMatching.reduce((acc, r) => acc + r.paxCount, 0);
+      const tablesDesc = sortedMatching.map(r => `${r.tableType === "mesa4" ? "M4" : "M2"} #${r.tableNumber}`).join(", ");
+      const hasExtraSeat = sortedMatching.some(r => r.hasExtraSeat);
+      
+      return {
+        id: prim.id,
+        clientPhone: prim.clientPhone,
+        clientName: prim.clientName,
+        gameId: prim.gameId,
+        gameName: prim.gameName,
+        status: prim.status,
+        reservations: sortedMatching,
+        totalPax,
+        tablesDesc,
+        hasExtraSeat,
+        isGrouped: sortedMatching.length > 1
+      };
+    });
+
+    return grouped.sort((a, b) => {
+      const nameA = (a.clientName || "").trim().toLowerCase();
+      const nameB = (b.clientName || "").trim().toLowerCase();
+      const comp = nameA.localeCompare(nameB, "pt-BR");
+      if (comp !== 0) {
+        return comp;
+      }
+      return a.id.localeCompare(b.id);
+    });
+  };
+
+  const getFilteredAndSortedReservations = (): Reservation[] => {
+    const filteredByTab = reservations.filter(r => {
+      const isCancelledOrReleased = r.status === "cancelado" || r.status === "liberada automaticamente";
+      if (reservationSubTab === "trash") {
+        return isCancelledOrReleased;
+      } else {
+        return !isCancelledOrReleased;
+      }
+    });
+
+    const filteredByGame = selectedGameId 
+      ? filteredByTab.filter(r => r.gameId === selectedGameId) 
+      : filteredByTab;
+
+    return [...filteredByGame].sort((a, b) => {
+      const nameA = (a.clientName || "").trim().toLowerCase();
+      const nameB = (b.clientName || "").trim().toLowerCase();
+      const comp = nameA.localeCompare(nameB, "pt-BR");
+      if (comp !== 0) {
+        return comp;
+      }
+      return a.tableNumber - b.tableNumber;
+    });
+  };
 
   // Dynamic homepage text editor states
   const [textBadge, setTextBadge] = useState("");
@@ -1775,8 +1941,51 @@ export default function AdminPanel({
 
       {/* TAB 3: RESERVATIONS VISUALIZATION */}
       {activeTab === "reservations" && (
-        <div className="space-y-6 animate-fade-in">
+        <div className="space-y-6 animate-fade-in text-soccer-cream">
           
+          {/* Subtabs for Active vs Trash Bin (Lixeira) */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-[#03150b] p-4 rounded-2xl border border-soccer-field/50">
+            <div className="flex bg-[#051c0f]/80 p-1 rounded-xl border border-soccer-field/40">
+              <button
+                id="res_subtab_active_btn"
+                type="button"
+                onClick={() => setReservationSubTab("active")}
+                className={`px-4 py-2 rounded-lg text-xs font-mono font-bold uppercase transition-all flex items-center gap-2 ${
+                  reservationSubTab === "active"
+                    ? "bg-soccer-field text-soccer-gold shadow"
+                    : "text-soccer-cream/60 hover:text-soccer-cream hover:bg-soccer-field/20"
+                }`}
+              >
+                Ativas & Confirmadas ({reservations.filter(r => r.status !== "cancelado" && r.status !== "liberada automaticamente").length})
+              </button>
+              <button
+                id="res_subtab_trash_btn"
+                type="button"
+                onClick={() => setReservationSubTab("trash")}
+                className={`px-4 py-2 rounded-lg text-xs font-mono font-bold uppercase transition-all flex items-center gap-2 ${
+                  reservationSubTab === "trash"
+                    ? "bg-red-900/80 text-red-100 border border-red-700 shadow"
+                    : "text-soccer-cream/50 hover:text-red-400 hover:bg-red-950/20"
+                }`}
+              >
+                <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                Lixeira ({reservations.filter(r => r.status === "cancelado" || r.status === "liberada automaticamente").length})
+              </button>
+            </div>
+
+            {/* Same Client Grouping Toggle (Somar Pessoas) */}
+            <label className="flex items-center gap-2.5 bg-[#051c0f] border border-soccer-field px-4 py-2 rounded-xl text-xs font-mono text-soccer-gold cursor-pointer hover:border-soccer-gold/60 transition-colors">
+              <input
+                id="group_same_client_checkbox"
+                type="checkbox"
+                checked={groupSameClient}
+                onChange={(e) => setGroupSameClient(e.target.checked)}
+                className="w-4 h-4 accent-soccer-field border-soccer-field rounded focus:ring-0 cursor-pointer"
+              />
+              <span>Somar / Agrupar Mesas do Mesmo Cliente 👥</span>
+            </label>
+          </div>
+
           {/* Reservation Filtering tools */}
           <div className="bg-[#03150b] p-5 rounded-2xl border border-soccer-field/90 grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -1788,100 +1997,253 @@ export default function AdminPanel({
                 className="w-full bg-[#051c0f] border border-soccer-field rounded-lg py-2 pl-3 pr-8 text-xs text-soccer-cream"
               >
                 <option value="">-- Todas as Copas --</option>
-                {games.map(g => (
+                {[...games].sort((a,b) => a.homeTeam.localeCompare(b.homeTeam, "pt-BR")).map(g => (
                   <option key={g.id} value={g.id}>{g.homeTeam} vs {g.awayTeam}</option>
                 ))}
               </select>
             </div>
             
             <div className="flex flex-col justify-end">
-              <span className="block text-[10px] font-mono text-soccer-cream/50 uppercase text-right mb-1">Total Exibição</span>
+              <span className="block text-[10px] font-mono text-soccer-cream/50 uppercase text-right mb-1">Total Exibição no Filtro</span>
               <span className="text-right text-xs font-mono font-bold text-soccer-gold">
-                {selectedGameId 
-                  ? reservations.filter(r => r.gameId === selectedGameId).length 
-                  : reservations.length} reservas registradas
+                {groupSameClient ? (
+                  <>
+                    {groupReservationsList(getFilteredAndSortedReservations()).length} registros agrupados por cliente
+                  </>
+                ) : (
+                  <>
+                    {getFilteredAndSortedReservations().length} reservas encontradas
+                  </>
+                )}
               </span>
             </div>
           </div>
 
           {/* LIST TABLE OF RESERVATIONS */}
-          <div className="overflow-x-auto bg-[#03150b] rounded-2xl border border-soccer-field">
-            <table className="w-full text-left text-xs text-soccer-cream">
-              <thead className="bg-soccer-field/30 uppercase text-[10px] font-mono text-soccer-gold border-b border-soccer-field">
-                <tr>
-                  <th className="px-4 py-4">Convidado / Tel</th>
-                  <th className="px-4 py-4">Jogo</th>
-                  <th className="px-4 py-4">Mesa</th>
-                  <th className="px-4 py-4">Pax</th>
-                  <th className="px-4 py-4">Status</th>
-                  <th className="px-4 py-4 text-right">Alterar Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-soccer-field/30">
-                {(selectedGameId 
-                  ? reservations.filter(r => r.gameId === selectedGameId) 
-                  : reservations
-                ).map((res) => {
-                  let statusColor = "bg-soccer-cream/10 text-soccer-cream/80 border-transparent";
-                  if (res.status === "confirmado" || res.status === "ativa") {
-                    statusColor = "bg-emerald-500/10 border-emerald-500/30 text-emerald-400";
-                  } else if (res.status === "aguardando comprovante") {
-                    statusColor = "bg-amber-500/10 border-amber-500/30 text-amber-400 animate-pulse";
-                  } else if (res.status === "cancelado" || res.status === "liberada automaticamente") {
-                    statusColor = "bg-red-500/10 border-red-500/30 text-red-400";
-                  }
+          <div className="overflow-x-auto bg-[#03150b] rounded-2xl border border-soccer-field shadow-lg">
+            
+            {groupSameClient ? (
+              /* GROUPED VIEW TABLE */
+              <table className="w-full text-left text-xs text-soccer-cream">
+                <thead className="bg-[#051c0f] uppercase text-[10px] font-mono text-soccer-gold border-b border-soccer-field/70">
+                  <tr>
+                    <th className="px-4 py-4">Convidado / Telefone</th>
+                    <th className="px-4 py-4">Jogo</th>
+                    <th className="px-4 py-4">Mesas Agrupadas</th>
+                    <th className="px-4 py-4">Total Pax (Soma)</th>
+                    <th className="px-4 py-4">Último Status</th>
+                    <th className="px-4 py-4 text-right">Ação Rápida</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-soccer-field/20">
+                  {groupReservationsList(getFilteredAndSortedReservations()).map((group) => {
+                    let statusColor = "bg-soccer-cream/10 text-soccer-cream/80 border-transparent";
+                    if (group.status === "confirmado" || group.status === "ativa") {
+                      statusColor = "bg-emerald-500/10 border-emerald-500/30 text-emerald-400";
+                    } else if (group.status === "aguardando comprovante") {
+                      statusColor = "bg-amber-500/10 border-amber-500/30 text-amber-400 animate-pulse";
+                    } else if (group.status === "cancelado" || group.status === "liberada automaticamente") {
+                      statusColor = "bg-red-500/10 border-red-500/30 text-red-400";
+                    }
 
-                  return (
-                    <tr key={res.id} className="hover:bg-soccer-field/20">
-                      <td className="px-4 py-4">
-                        <div className="font-semibold text-sm">{res.clientName}</div>
-                        <div className="text-[10px] font-mono text-soccer-cream/60 flex items-center gap-1 mt-0.5">
-                          <PhoneCall className="w-3 h-3 text-soccer-orange shrink-0" />
-                          <span>{res.clientPhone}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-4 truncate max-w-[150px]">
-                        <div>{res.gameName}</div>
-                        <div className="text-[9px] font-mono text-soccer-cream/40">ID: {(res.id || "").substring(0, 5).toUpperCase()}</div>
-                      </td>
-                      <td className="px-4 py-4 font-mono text-xs font-black">
-                        <span className="text-soccer-gold">
-                          {res.tableType === "mesa4" ? "M4" : "M2"}
-                        </span>
-                        <span className="ml-1 text-soccer-cream">#{res.tableNumber}</span>
-                      </td>
-                      <td className="px-4 py-4 font-mono">
-                        <div>{res.paxCount} pessoas</div>
-                        {res.hasExtraSeat && (
-                          <span className="inline-block mt-1 bg-yellow-500/10 border border-yellow-500/30 text-soccer-gold text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider">
-                            +1 Cadeira Extra
+                    return (
+                      <tr key={`group_${group.id}`} className="hover:bg-soccer-field/15">
+                        <td className="px-4 py-4">
+                          <div className="font-semibold text-sm flex items-center gap-1.5 text-soccer-cream">
+                            {group.clientName}
+                            <span className="px-1.5 py-0.5 bg-soccer-gold/10 text-soccer-gold rounded font-bold text-[9px] uppercase">
+                              {group.reservations.length}x Mesas
+                            </span>
+                          </div>
+                          <div className="text-[10px] font-mono text-soccer-cream/60 flex items-center gap-1 mt-1">
+                            <PhoneCall className="w-3 h-3 text-soccer-orange shrink-0" />
+                            <span>{group.clientPhone}</span>
+                          </div>
+                          
+                          {/* Direct Whatsapp send option */}
+                          <button
+                            type="button"
+                            onClick={() => handleSendWhatsAppGroup(group)}
+                            className="mt-2 inline-flex items-center gap-1 bg-emerald-600 hover:bg-emerald-500 hover:scale-[1.02] text-white font-mono font-black text-[9px] uppercase tracking-wider px-2 py-1 rounded-md transition-all cursor-pointer shadow-sm active:translate-y-px"
+                          >
+                            <MessageSquare className="w-3 h-3 shrink-0" />
+                            <span>WhatsApp do Grupo 💚</span>
+                          </button>
+                        </td>
+                        
+                        <td className="px-4 py-4 truncate max-w-[150px]">
+                          <div className="font-medium text-soccer-cream/95">{group.gameName}</div>
+                          <div className="text-[9px] font-mono text-soccer-cream/40">Múltiplos IDs</div>
+                        </td>
+                        
+                        <td className="px-4 py-4 font-mono text-xs font-black">
+                          <span className="text-soccer-gold bg-soccer-gold/5 px-2 py-1 border border-soccer-gold/10 rounded">
+                            {group.tablesDesc}
                           </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-4">
-                        <span className={`px-2 py-0.5 rounded border text-[10px] uppercase font-bold ${statusColor}`}>
-                          {res.status}
-                        </span>
-                      </td>
-                      <td className="px-4 py-4 text-right">
-                        <select
-                          id={`change_res_status_${res.id}`}
-                          value={res.status}
-                          onChange={(e) => handleUpdateStatus(res.id, e.target.value as ReservationStatus)}
-                          className="bg-[#051c0f] border border-soccer-field rounded-lg text-[11px] font-semibold text-soccer-cream py-1 px-1 outline-none"
-                        >
-                          <option value="aguardando comprovante">Aguardando Pgto</option>
-                          <option value="confirmado">Confirmado ✔</option>
-                          <option value="ativa">Ativa ⚽</option>
-                          <option value="cancelado">Cancelado ✖</option>
-                          <option value="liberada automaticamente">Liberada Auto 🕒</option>
-                        </select>
+                        </td>
+                        
+                        <td className="px-4 py-4 font-mono">
+                          <div className="font-bold text-sm text-soccer-field-light">{group.totalPax} pessoas</div>
+                          <div className="text-[9px] text-soccer-cream/50">(Soma total de todas as comarcas)</div>
+                        </td>
+                        
+                        <td className="px-4 py-4">
+                          <span className={`px-2 py-0.5 rounded border text-[10px] uppercase font-bold inline-block ${statusColor}`}>
+                            {group.status}
+                          </span>
+                        </td>
+                        
+                        <td className="px-4 py-4 text-right">
+                          <div className="flex flex-col gap-1 items-end">
+                            <span className="text-[9px] text-soccer-cream/40 block">Alterar todas:</span>
+                            <select
+                              id={`change_group_status_${group.id}`}
+                              value={group.status}
+                              onChange={async (e) => {
+                                const nextSt = e.target.value as ReservationStatus;
+                                // Perform update for ALL reservations of this group
+                                for (const r of group.reservations) {
+                                  await handleUpdateStatus(r.id, nextSt);
+                                }
+                              }}
+                              className="bg-[#051c0f] border border-soccer-field rounded-lg text-[10px] font-semibold text-soccer-cream py-1 px-1.5 outline-none cursor-pointer"
+                            >
+                              <option value="aguardando comprovante">Aguardando Pgto</option>
+                              <option value="confirmado">Confirmado ✔</option>
+                              <option value="ativa">Ativa ⚽</option>
+                              <option value="cancelado">Cancelado ✖</option>
+                              <option value="liberada automaticamente">Liberada Auto 🕒</option>
+                            </select>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {groupReservationsList(getFilteredAndSortedReservations()).length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="text-center py-10 text-soccer-cream/50 italic font-mono">
+                        Nenhuma reserva correspondente nesta seção.
                       </td>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                  )}
+                </tbody>
+              </table>
+            ) : (
+              /* INDIVIDUAL VIEW TABLE (ALPHABETICAL & NUMERICAL SORTED) */
+              <table className="w-full text-left text-xs text-soccer-cream">
+                <thead className="bg-[#051c0f] uppercase text-[10px] font-mono text-soccer-gold border-b border-soccer-field/70">
+                  <tr>
+                    <th className="px-4 py-4">Convidado / Tel</th>
+                    <th className="px-4 py-4">Jogo</th>
+                    <th className="px-4 py-4">Mesa</th>
+                    <th className="px-4 py-4">Pax</th>
+                    <th className="px-4 py-4">Status</th>
+                    <th className="px-4 py-4 text-right">Ações</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-soccer-field/20">
+                  {getFilteredAndSortedReservations().map((res) => {
+                    let statusColor = "bg-soccer-cream/10 text-soccer-cream/80 border-transparent";
+                    if (res.status === "confirmado" || res.status === "ativa") {
+                      statusColor = "bg-emerald-500/10 border-emerald-500/30 text-emerald-400";
+                    } else if (res.status === "aguardando comprovante") {
+                      statusColor = "bg-amber-500/10 border-amber-500/30 text-amber-400 animate-pulse";
+                    } else if (res.status === "cancelado" || res.status === "liberada automaticamente") {
+                      statusColor = "bg-red-500/10 border-red-500/30 text-red-400";
+                    }
+
+                    // Read other tables/pax of this duplicate client if any
+                    const agg = getClientAggregation(res.clientPhone);
+                    const isMulti = agg.totalTables > 1;
+
+                    return (
+                      <tr key={res.id} className="hover:bg-soccer-field/15">
+                        <td className="px-4 py-4">
+                          <div className="font-semibold text-sm flex items-center gap-1.5">
+                            <span>{res.clientName}</span>
+                            {isMulti && (
+                              <span className="px-1.5 py-0.5 bg-soccer-orange/10 border border-soccer-orange/20 text-soccer-orange rounded text-[9px] font-mono font-bold">
+                                MULTI
+                              </span>
+                            )}
+                          </div>
+                          
+                          <div className="text-[10px] font-mono text-soccer-cream/60 flex items-center gap-1 mt-1">
+                            <PhoneCall className="w-3 h-3 text-soccer-orange shrink-0" />
+                            <span>{res.clientPhone}</span>
+                          </div>
+
+                          {isMulti && (
+                            <div className="mt-1 pb-1 block text-[9.5px] font-semibold text-soccer-gold">
+                              🕒 Cliente reservou {agg.totalTables} mesas, somando total de {agg.totalPax} pessoas.
+                            </div>
+                          )}
+
+                          {/* Action button to direct WhatsApp notification */}
+                          <button
+                            type="button"
+                            onClick={() => handleSendWhatsApp(res)}
+                            className="mt-2 inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 hover:scale-[1.02] text-white font-mono font-black text-[9px] uppercase tracking-wider px-2 py-1 rounded transition-all cursor-pointer shadow shadow-emerald-950/20 active:translate-y-px"
+                          >
+                            <MessageSquare className="w-3 h-3 shrink-0" />
+                            <span>WhatsApp 💚</span>
+                          </button>
+                        </td>
+
+                        <td className="px-4 py-4 truncate max-w-[150px]">
+                          <div className="font-semibold text-soccer-cream/90">{res.gameName}</div>
+                          <div className="text-[9px] font-mono text-soccer-cream/40">ID: {(res.id || "").substring(0, 5).toUpperCase()}</div>
+                        </td>
+
+                        <td className="px-4 py-4 font-mono text-xs font-black">
+                          <span className="text-soccer-gold bg-soccer-gold/5 px-2 py-0.5 rounded border border-soccer-gold/10">
+                            {res.tableType === "mesa4" ? "M4" : "M2"}
+                          </span>
+                          <span className="ml-1 text-soccer-cream">#{res.tableNumber}</span>
+                        </td>
+
+                        <td className="px-4 py-4 font-mono">
+                          <div className="font-bold text-xs">{res.paxCount} pessoas</div>
+                          {res.hasExtraSeat && (
+                            <span className="inline-block mt-1 bg-yellow-500/10 border border-yellow-500/30 text-soccer-gold text-[8.5px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider">
+                              +1 Extra
+                            </span>
+                          )}
+                        </td>
+
+                        <td className="px-4 py-4">
+                          <span className={`px-2 py-0.5 rounded border text-[10px] uppercase font-bold inline-block ${statusColor}`}>
+                            {res.status}
+                          </span>
+                        </td>
+
+                        <td className="px-4 py-4 text-right">
+                          <select
+                            id={`change_res_status_${res.id}`}
+                            value={res.status}
+                            onChange={(e) => handleUpdateStatus(res.id, e.target.value as ReservationStatus)}
+                            className="bg-[#051c0f] border border-soccer-field rounded-lg text-[10.5px] font-semibold text-soccer-cream py-1 px-1 outline-none cursor-pointer"
+                          >
+                            <option value="aguardando comprovante">Aguardando Pgto</option>
+                            <option value="confirmado">Confirmado ✔</option>
+                            <option value="ativa">Ativa ⚽</option>
+                            <option value="cancelado">Cancelado ✖</option>
+                            <option value="liberada automaticamente">Liberada Auto 🕒</option>
+                          </select>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {getFilteredAndSortedReservations().length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="text-center py-10 text-soccer-cream/50 italic font-mono">
+                        Nenhuma reserva ativa ou no filtro para esta visualização.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            )}
           </div>
 
         </div>
