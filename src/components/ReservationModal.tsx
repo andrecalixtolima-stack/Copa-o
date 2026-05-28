@@ -384,9 +384,11 @@ export default function ReservationModal({
     const pCount = res ? res.paxCount : (extraSeat ? paxCount + 1 : paxCount);
     const hasExtra = res ? !!res.hasExtraSeat : extraSeat;
     
+    // Explicitly determine value to make the PIX and Reservation audit airtight
+    const resPrice = res ? getCreatedReservationPrice() : calculatePrice();
     const extraLabel = hasExtra ? " (com 1 cadeira/ingresso extra individual)" : "";
     
-    const textMsg = `Olá! Acabei de fazer minha reserva para o COPAÇO no Quinteiro e estou enviando meu comprovante de pagamento.\n\n*Resumo da Reserva*:\nCliente: ${client}\nJogo: ${matchName}\nMesa Reservada: ${tType === "mesa4" ? "Mesa para 4 pessoas" : "Mesa para 2 pessoas"} - Número #${tNum}${extraLabel}\nQuantidade de pessoas: ${pCount} pessoas\n\nAguardando confirmação!`;
+    const textMsg = `Olá! Acabei de fazer minha reserva para o COPAÇO no Quinteiro e estou enviando meu comprovante de pagamento.\n\n*Resumo da Reserva*:\nCliente: ${client}\nJogo: ${matchName}\nMesa Reservada: ${tType === "mesa4" ? "Mesa para 4 pessoas" : "Mesa para 2 pessoas"} - Número #${tNum}${extraLabel}\nQuantidade de pessoas: ${pCount} pessoas\nValor total via PIX: R$ ${resPrice},00\n\nAguardando confirmação!`;
     return `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(textMsg)}`;
   };
 
@@ -716,13 +718,13 @@ export default function ReservationModal({
                             setTableType("mesa4");
                             setSelectedTableNumber(null);
                           }}
-                          className={`px-3 py-1 rounded-md transition-all font-semibold select-none ${
+                          className={`px-3.5 py-1.5 rounded-md transition-all font-mono text-[10px] uppercase tracking-wider font-extrabold select-none cursor-pointer ${
                             tableType === "mesa4"
-                              ? "bg-soccer-gold text-soccer-dark shadow font-bold"
-                              : "text-soccer-cream/60 hover:text-soccer-cream"
+                              ? "bg-soccer-gold text-soccer-dark shadow font-black scale-102"
+                              : "text-soccer-cream/60 hover:text-soccer-cream hover:bg-white/5"
                           }`}
                         >
-                          Mesa de 4
+                          Mesa de 4 (M4)
                         </button>
                         <button
                           id="select_mesa2_type_btn"
@@ -732,13 +734,13 @@ export default function ReservationModal({
                             setTableType("mesa2");
                             setSelectedTableNumber(null);
                           }}
-                          className={`px-3 py-1 rounded-md transition-all font-semibold select-none disabled:opacity-40 ${
+                          className={`px-3.5 py-1.5 rounded-md transition-all font-mono text-[10px] uppercase tracking-wider font-extrabold select-none disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer ${
                             tableType === "mesa2"
-                              ? "bg-soccer-gold text-white shadow font-bold"
-                              : "text-soccer-dark/75 hover:text-soccer-dark"
+                              ? "bg-soccer-gold text-soccer-dark shadow font-black scale-102"
+                              : "text-soccer-cream/60 hover:text-soccer-cream hover:bg-white/5"
                           }`}
                         >
-                          Mesa de 2 {paxCount > 2 && "⚠️"}
+                          Mesa de 2 (M2) {paxCount > 2 && "⚠️"}
                         </button>
                       </div>
                     </div>
@@ -910,7 +912,7 @@ export default function ReservationModal({
                   AGUARDANDO PAGAMENTO PIX
                 </span>
                 <h3 className="text-2xl font-display font-black text-soccer-cream">
-                  Efetue o pagamento de R$ {calculatePrice()},00
+                  Efetue o pagamento de R$ {getCreatedReservationPrice()},00
                 </h3>
                 <p className="text-xs text-soccer-cream/70 mt-2">
                   As mesas de jogos do Brasil são concorridas e necessitam de comprovação de depósito via PIX para garantia de vaga.
