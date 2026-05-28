@@ -372,8 +372,9 @@ export default function AdminPanel({
   const [groupSameClient, setGroupSameClient] = useState(false);
 
   // Helper to normalize phone
-  const normalizePhone = (phone: string) => {
-    let num = phone.replace(/\D/g, "");
+  const normalizePhone = (phone: string | undefined | null) => {
+    if (!phone) return "";
+    let num = String(phone).replace(/\D/g, "");
     if ((num.length === 10 || num.length === 11) && !num.startsWith("55")) {
       num = "55" + num;
     }
@@ -445,12 +446,20 @@ Esperamos vocês!`;
     window.open(url, "_blank", "noopener,noreferrer");
   };
 
-  const getClientAggregation = (phone: string, activeOnly: boolean = true) => {
-    const normPhone = phone.replace(/\D/g, "");
+  const getClientAggregation = (phone: string | undefined | null, activeOnly: boolean = true) => {
+    if (!phone) {
+      return {
+        totalTables: 0,
+        totalPax: 0,
+        occurrences: []
+      };
+    }
+    const normPhone = String(phone).replace(/\D/g, "");
     const occurrences = reservations.filter(r => {
+      if (!r.clientPhone) return false;
       const isCancelled = r.status === "cancelado" || r.status === "liberada automaticamente";
       if (activeOnly && isCancelled) return false;
-      return r.clientPhone.replace(/\D/g, "") === normPhone;
+      return String(r.clientPhone).replace(/\D/g, "") === normPhone;
     });
     
     const totalTables = occurrences.length;
@@ -467,7 +476,7 @@ Esperamos vocês!`;
     const groups: { [key: string]: Reservation[] } = {};
     
     list.forEach(r => {
-      const phoneKey = r.clientPhone.replace(/\D/g, "");
+      const phoneKey = r.clientPhone ? String(r.clientPhone).replace(/\D/g, "") : `no_phone_${r.id}`;
       const key = `${r.gameId}_${phoneKey}`;
       if (!groups[key]) {
         groups[key] = [];
