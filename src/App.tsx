@@ -531,7 +531,7 @@ export default function App() {
                 reservations={reservations} 
                 blockedTables={blockedTables} 
                 onSelectGame={setSelectedGame} 
-                isAdmin={true} // allow edit actions if authenticated admin clicks
+                isAdmin={isFirebaseAdmin} // allow edit actions if authenticated admin clicks
                 onEditGame={(g) => {
                   setGameToEdit(g);
                   setIsAdminMode(true);
