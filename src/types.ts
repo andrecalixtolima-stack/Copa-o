@@ -39,6 +39,7 @@ export interface Reservation {
   tableType: "mesa4" | "mesa2";
   tableNumber: number; // 1-indexed up to respective tablesTotal
   status: ReservationStatus;
+  hasExtraSeat?: boolean;
   paymentProofUrl?: string; // or text proof info
   paymentMethod?: "pix" | "pagseguro" | "gratis";
   paymentId?: string;

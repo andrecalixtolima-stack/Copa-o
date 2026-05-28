@@ -174,7 +174,7 @@ app.post("/api/reservations/create", createRateLimiter(10, 5 * 60 * 1000), async
     const { 
       gameId, gameName, gameDateTime, isBrazilGame, 
       clientName, clientPhone, paxCount, tableType, tableNumber,
-      paymentMethod, paymentId, status
+      paymentMethod, paymentId, status, hasExtraSeat
     } = req.body;
 
     console.log(`[EXPRESS RESERVATION] Table #${tableNumber} for Game: ${gameName}. Client: ${clientName}`);
@@ -217,6 +217,7 @@ app.post("/api/reservations/create", createRateLimiter(10, 5 * 60 * 1000), async
       tableType,
       tableNumber: Number(tableNumber),
       status: initialStatus,
+      hasExtraSeat: !!hasExtraSeat,
       paymentMethod: paymentMethod || (isBrazilGame ? "pix" : "gratis"),
       paymentId: paymentId || "",
       createdAt: timestamp,

@@ -37,6 +37,7 @@ export default function ReservationModal({
   const [paxCount, setPaxCount] = useState<number>(4);
   const [tableType, setTableType] = useState<"mesa4" | "mesa2">("mesa4");
   const [selectedTableNumber, setSelectedTableNumber] = useState<number | null>(null);
+  const [extraSeat, setExtraSeat] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [formError, setFormError] = useState("");
@@ -88,7 +89,14 @@ export default function ReservationModal({
 
   const calculatePrice = () => {
     if (!game.isBrazilGame) return 0;
-    return tableType === "mesa4" ? (game.priceTable4 || 24) : (game.priceTable2 || 12);
+    const basePrice = tableType === "mesa4" ? (game.priceTable4 || 24) : (game.priceTable2 || 12);
+    return extraSeat ? (basePrice + 6) : basePrice;
+  };
+
+  const getCreatedReservationPrice = () => {
+    if (!createdReservation) return calculatePrice();
+    const basePrice = createdReservation.tableType === "mesa4" ? (game.priceTable4 || 24) : (game.priceTable2 || 12);
+    return createdReservation.hasExtraSeat ? (basePrice + 6) : basePrice;
   };
 
   const handleCardPaymentSubmit = async (e: React.FormEvent) => {
@@ -298,9 +306,10 @@ export default function ReservationModal({
           isBrazilGame: game.isBrazilGame,
           clientName: clientName.trim(),
           clientPhone: clientPhone.trim(),
-          paxCount: paxCount,
+          paxCount: extraSeat ? (paxCount + 1) : paxCount,
           tableType: tableType,
-          tableNumber: selectedTableNumber
+          tableNumber: selectedTableNumber,
+          hasExtraSeat: extraSeat
         })
       });
 
@@ -358,10 +367,21 @@ export default function ReservationModal({
 
   // Pre-formatted messages
   const whatsappNumber = "+5531975099398";
-  const whatsappMsg = encodeURIComponent(
-    `Olá! Acabei de fazer minha reserva para o COPAÇO no Quinteiro e estou enviando meu comprovante de pagamento.\n\n*Resumo da Reserva*:\nCliente: ${clientName}\nJogo: ${game.homeTeam} vs ${game.awayTeam}\nMesa Reservada: ${tableType === "mesa4" ? "Mesa para 4 pessoas" : "Mesa para 2 pessoas"} - Número #${selectedTableNumber}\nQuantidade de pessoas: ${paxCount}\n\nAguardando confirmação!`
-  );
-  const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${whatsappMsg}`;
+  
+  const getWhatsappUrl = () => {
+    const res = createdReservation;
+    const client = res ? res.clientName : clientName;
+    const matchName = res ? res.gameName : `${game.homeTeam} vs ${game.awayTeam}`;
+    const tType = res ? res.tableType : tableType;
+    const tNum = res ? res.tableNumber : selectedTableNumber;
+    const pCount = res ? res.paxCount : (extraSeat ? paxCount + 1 : paxCount);
+    const hasExtra = res ? !!res.hasExtraSeat : extraSeat;
+    
+    const extraLabel = hasExtra ? " (com 1 cadeira/ingresso extra individual)" : "";
+    
+    const textMsg = `Olá! Acabei de fazer minha reserva para o COPAÇO no Quinteiro e estou enviando meu comprovante de pagamento.\n\n*Resumo da Reserva*:\nCliente: ${client}\nJogo: ${matchName}\nMesa Reservada: ${tType === "mesa4" ? "Mesa para 4 pessoas" : "Mesa para 2 pessoas"} - Número #${tNum}${extraLabel}\nQuantidade de pessoas: ${pCount} pessoas\n\nAguardando confirmação!`;
+    return `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(textMsg)}`;
+  };
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-soccer-dark/90 backdrop-blur-sm flex items-center justify-center p-4">
@@ -561,6 +581,29 @@ export default function ReservationModal({
                         </select>
                       </div>
                     </div>
+
+                    {/* Odd-number extra seat option for Brazil games */}
+                    {game.isBrazilGame && (
+                      <div className="bg-[#042010] border border-soccer-field/40 p-3 rounded-xl mt-3 space-y-1.5 transition-all">
+                        <label className="flex items-start gap-2.5 cursor-pointer group select-none">
+                          <input
+                            id="extra_seat_checkbox"
+                            type="checkbox"
+                            checked={extraSeat}
+                            onChange={(e) => setExtraSeat(e.target.checked)}
+                            className="mt-0.5 rounded border-soccer-field/60 text-soccer-gold focus:ring-0 cursor-pointer h-4 w-4 bg-[#03140a]"
+                          />
+                          <div className="text-xs">
+                            <span className="font-bold text-white group-hover:text-soccer-gold transition-colors block">
+                              Adicionar ingresso extra? (Ímpar)
+                            </span>
+                            <span className="text-[10px] text-soccer-cream/70 leading-normal block mt-0.5">
+                              Quero incluir 1 cadeira / pessoa adicional na minha mesa pagando antecipadamente <strong className="text-soccer-gold font-bold">+ R$ 6,00</strong>.
+                            </span>
+                          </div>
+                        </label>
+                      </div>
+                    )}
                   </div>
 
                   {/* Summary Area */}
@@ -589,17 +632,26 @@ export default function ReservationModal({
                       </div>
                       <div className="border-t border-soccer-field mt-3 pt-3 space-y-1.5 text-right flex flex-col items-end">
                         <div className="flex justify-between w-full items-center">
-                          <span className="text-xs font-display font-medium text-soccer-cream/70">Custo p/ Pessoa (Antecipado):</span>
-                          <span className="text-lg font-display font-black text-soccer-gold font-mono animate-pulse">
+                          <span className="text-xs font-display font-medium text-soccer-cream/70">Mesa (Antecipado):</span>
+                          <span className="text-sm font-display font-black text-soccer-cream font-mono">
                             {tableType === "mesa4" 
-                              ? `4x R$ ${Math.round((game.priceTable4 || 24) / 4)} por pessoa` 
-                              : `2x R$ ${Math.round((game.priceTable2 || 12) / 2)} por pessoa`}
+                              ? `R$ ${game.priceTable4 || 24},00` 
+                              : `R$ ${game.priceTable2 || 12},00`}
                           </span>
                         </div>
+                        {extraSeat && (
+                          <div className="flex justify-between w-full items-center text-xs text-soccer-gold">
+                            <span>1x Cadeira Extra (Ímpar):</span>
+                            <span className="font-mono font-bold">+ R$ 6,00</span>
+                          </div>
+                        )}
                         {game.isBrazilGame && (
-                          <span className="text-[10px] text-soccer-cream/45">
-                            Total da mesa via PIX: R$ {calculatePrice()},00
-                          </span>
+                          <div className="flex justify-between w-full items-center pt-2 border-t border-soccer-field/30 mt-1">
+                            <span className="text-xs font-bold text-white">Total via PIX:</span>
+                            <span className="text-lg font-display font-black text-soccer-gold font-mono animate-pulse">
+                              R$ {calculatePrice()},00
+                            </span>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -886,11 +938,11 @@ export default function ReservationModal({
                 <div className="bg-[#03150b] p-4 rounded-xl border border-soccer-field/55 flex justify-between items-center font-mono text-xs">
                   <div>
                     <span className="block text-[10px] uppercase font-bold text-soccer-gold">Valor do Pix</span>
-                    <span className="font-display text-lg text-soccer-cream font-extrabold">R$ {calculatePrice()},00</span>
+                    <span className="font-display text-lg text-soccer-cream font-extrabold">R$ {getCreatedReservationPrice()},00</span>
                   </div>
                   <div className="text-right text-[10px] text-soccer-cream/50">
-                    Mesa #{selectedTableNumber}<br />
-                    Para {paxCount} pessoas
+                    Mesa #{createdReservation ? createdReservation.tableNumber : selectedTableNumber}<br />
+                    Para {createdReservation ? createdReservation.paxCount : (extraSeat ? paxCount + 1 : paxCount)} pessoas {(createdReservation?.hasExtraSeat || (!createdReservation && extraSeat)) ? "(Ímpar)" : ""}
                   </div>
                 </div>
               </div>
@@ -909,7 +961,7 @@ export default function ReservationModal({
                 <button
                   id="confirm_payment_whatsapp_btn"
                   onClick={() => {
-                    window.open(whatsappUrl, "_blank", "noopener,noreferrer");
+                    window.open(getWhatsappUrl(), "_blank", "noopener,noreferrer");
                     setStep("success");
                   }}
                   className="flex-1 bg-gradient-to-r from-emerald-600 to-green-700 hover:from-emerald-500 hover:to-green-600 text-soccer-cream py-3.5 rounded-xl text-xs font-display font-bold flex items-center justify-center gap-2 shadow-lg cursor-pointer"
@@ -962,6 +1014,16 @@ export default function ReservationModal({
                     <span className="text-soccer-gold font-bold">
                       {createdReservation.tableType === "mesa4" ? "Mesa para 4 Pessoas" : "Mesa para 2 Pessoas"} - Número #{createdReservation.tableNumber}
                     </span>
+                  </div>
+                  {createdReservation.hasExtraSeat && (
+                    <div className="flex justify-between text-yellow-400">
+                      <span className="text-yellow-400/70">Ingresso Extra (Ímpar):</span>
+                      <span className="font-bold">+1 cadeira / ingresso incluído</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between">
+                    <span className="text-soccer-cream/50">Total de Pessoas:</span>
+                    <span className="text-soccer-cream font-semibold">{createdReservation.paxCount} pessoas</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-soccer-cream/50">Convidado Principal:</span>

@@ -220,7 +220,7 @@ export default function AdminPanel({
     }
 
     try {
-      const csvHeaders = ["ID", "Jogo", "Data do Jogo", "Tipo", "Mesa #", "Cliente", "WhatsApp", "Pax", "Status", "Criado Em"];
+      const csvHeaders = ["ID", "Jogo", "Data do Jogo", "Tipo", "Mesa #", "Cliente", "WhatsApp", "Pax", "Extra Cadeira", "Status", "Criado Em"];
       const csvRows = reservations.map(r => [
         r.id,
         `"${r.gameName}"`,
@@ -230,6 +230,7 @@ export default function AdminPanel({
         `"${r.clientName}"`,
         `"${r.clientPhone}"`,
         r.paxCount,
+        r.hasExtraSeat ? "Sim" : "Não",
         r.status,
         r.createdAt
       ]);
@@ -483,9 +484,13 @@ export default function AdminPanel({
     activeReservas.forEach(r => {
       if (r.isBrazilGame) {
         const game = games.find(g => g.id === r.gameId);
-        const price = r.tableType === "mesa4" 
+        let price = r.tableType === "mesa4" 
           ? (game?.priceTable4 || 24) 
           : (game?.priceTable2 || 12);
+        
+        if (r.hasExtraSeat) {
+          price += 6;
+        }
         
         faturamentoPrevisto += price;
         if (r.status === "confirmado" || r.status === "ativa") {
@@ -1845,7 +1850,14 @@ export default function AdminPanel({
                         </span>
                         <span className="ml-1 text-soccer-cream">#{res.tableNumber}</span>
                       </td>
-                      <td className="px-4 py-4 font-mono">{res.paxCount} pessoas</td>
+                      <td className="px-4 py-4 font-mono">
+                        <div>{res.paxCount} pessoas</div>
+                        {res.hasExtraSeat && (
+                          <span className="inline-block mt-1 bg-yellow-500/10 border border-yellow-500/30 text-soccer-gold text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider">
+                            +1 Cadeira Extra
+                          </span>
+                        )}
+                      </td>
                       <td className="px-4 py-4">
                         <span className={`px-2 py-0.5 rounded border text-[10px] uppercase font-bold ${statusColor}`}>
                           {res.status}
