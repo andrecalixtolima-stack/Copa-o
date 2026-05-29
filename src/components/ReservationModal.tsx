@@ -729,25 +729,27 @@ export default function ReservationModal({
                         <button
                           id="select_mesa2_type_btn"
                           type="button"
-                          disabled={paxCount > 2}
                           onClick={() => {
+                            if (paxCount > 2) {
+                              setPaxCount(2);
+                            }
                             setTableType("mesa2");
                             setSelectedTableNumber(null);
                           }}
-                          className={`px-3.5 py-1.5 rounded-md transition-all font-mono text-[10px] uppercase tracking-wider font-extrabold select-none disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer ${
+                          className={`px-3.5 py-1.5 rounded-md transition-all font-mono text-[10px] uppercase tracking-wider font-extrabold select-none cursor-pointer ${
                             tableType === "mesa2"
                               ? "bg-soccer-gold text-soccer-dark shadow font-black scale-102"
                               : "text-soccer-cream/60 hover:text-soccer-cream hover:bg-white/5"
                           }`}
                         >
-                          Mesa de 2 (M2) {paxCount > 2 && "⚠️"}
+                          Mesa de 2 (M2)
                         </button>
                       </div>
                     </div>
 
                     {paxCount > 2 && tableType === "mesa4" && (
-                      <p className="text-[10px] text-soccer-dark/70 mb-3 bg-soccer-field/25 p-2 rounded-lg italic">
-                        💡 Mesas de 4 são recomendadas para seu grupo de {paxCount} pessoas. Mesas de 2 estarão desabilitadas.
+                      <p className="text-[10px] text-soccer-cream/80 mb-3 bg-soccer-field/25 p-2 rounded-lg italic">
+                        💡 Mesas de 4 são recomendadas para seu grupo de {paxCount} pessoas. Se você preferir uma Mesa de 2 lugares (M2), clique em "Mesa de 2" acima (sua quantidade de pessoas será ajustada para 2).
                       </p>
                     )}
 
