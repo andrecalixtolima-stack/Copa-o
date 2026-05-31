@@ -370,6 +370,7 @@ export default function AdminPanel({
   // Reservations filtering, sub-tab (Lixeira) and grouping states
   const [reservationSubTab, setReservationSubTab] = useState<"active" | "trash">("active");
   const [groupSameClient, setGroupSameClient] = useState(false);
+  const [resSearchQuery, setResSearchQuery] = useState("");
 
   // Reservation Edit states
   const [editingRes, setEditingRes] = useState<Reservation | null>(null);
@@ -602,7 +603,17 @@ Esperamos vocês!`;
       ? filteredByTab.filter(r => r.gameId === selectedGameId) 
       : filteredByTab;
 
-    return [...filteredByGame].sort((a, b) => {
+    const filteredBySearch = resSearchQuery.trim()
+      ? filteredByGame.filter(r => {
+          const query = resSearchQuery.toLowerCase().trim();
+          const name = (r.clientName || "").toLowerCase();
+          const phone = (r.clientPhone || "").replace(/\D/g, "");
+          const cleanQuery = query.replace(/\D/g, "");
+          return name.includes(query) || phone.includes(cleanQuery || query);
+        })
+      : filteredByGame;
+
+    return [...filteredBySearch].sort((a, b) => {
       const nameA = (a.clientName || "").trim().toLowerCase();
       const nameB = (b.clientName || "").trim().toLowerCase();
       const comp = nameA.localeCompare(nameB, "pt-BR");
@@ -2067,7 +2078,7 @@ Esperamos vocês!`;
           </div>
 
           {/* Reservation Filtering tools */}
-          <div className="bg-[#03150b] p-5 rounded-2xl border border-soccer-field/90 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="bg-[#03150b] p-5 rounded-2xl border border-soccer-field/90 grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-[10px] font-mono text-soccer-gold uppercase mb-1">Filtrar por Partida</label>
               <select
@@ -2081,6 +2092,29 @@ Esperamos vocês!`;
                   <option key={g.id} value={g.id}>{g.homeTeam} vs {g.awayTeam}</option>
                 ))}
               </select>
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-mono text-soccer-gold uppercase mb-1">🔍 Pesquisar Reserva (Nome / Fone)</label>
+              <div className="relative">
+                <input
+                  id="admin_reservations_search_input"
+                  type="text"
+                  value={resSearchQuery}
+                  onChange={(e) => setResSearchQuery(e.target.value)}
+                  placeholder="Ex: André ou 3197..."
+                  className="w-full bg-[#051c0f] border border-soccer-field rounded-lg py-2 px-3 text-xs text-soccer-cream placeholder-soccer-cream/30 outline-none focus:border-soccer-gold transition-all"
+                />
+                {resSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setResSearchQuery("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-soccer-cream/40 hover:text-soccer-cream hover:bg-white/5 w-5 h-5 rounded-full flex items-center justify-center text-[10px] transition-colors cursor-pointer"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
             </div>
             
             <div className="flex flex-col justify-end">

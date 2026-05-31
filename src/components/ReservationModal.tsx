@@ -43,6 +43,10 @@ export default function ReservationModal({
   const [formError, setFormError] = useState("");
   const [copied, setCopied] = useState(false);
   const [createdReservation, setCreatedReservation] = useState<Reservation | null>(null);
+  
+  // Duplicate reservation warning states
+  const [duplicateResFound, setDuplicateResFound] = useState<Reservation | null>(null);
+  const [bypassDuplicate, setBypassDuplicate] = useState(false);
 
   // PagSeguro state management
   const [paymentOption, setPaymentOption] = useState<"pix" | "pagseguro">("pix");
@@ -274,6 +278,21 @@ export default function ReservationModal({
       return;
     }
 
+    // Check if the user already has a pending ("aguardando comprovante") reservation
+    if (!bypassDuplicate) {
+      const normPhone = (p: string) => p.replace(/\D/g, "");
+      const cleanPhone = normPhone(clientPhone);
+      
+      const existingPending = activeReservationsForGame.find(
+        r => r.status === "aguardando comprovante" && normPhone(r.clientPhone) === cleanPhone
+      );
+      
+      if (existingPending) {
+        setDuplicateResFound(existingPending);
+        return; // Prevent submitting a new booking immediately
+      }
+    }
+
     // Double check rules on submission
     const currentChairsCountForGame = activeReservationsForGame.reduce((acc, r) => acc + (r.paxCount || 0), 0);
     const addedChairs = extraSeat ? (paxCount + 1) : paxCount;
@@ -377,12 +396,12 @@ export default function ReservationModal({
   
   const getWhatsappUrl = () => {
     const res = createdReservation;
-    const client = res ? res.clientName : clientName;
-    const matchName = res ? res.gameName : `${game.homeTeam} vs ${game.awayTeam}`;
-    const tType = res ? res.tableType : tableType;
-    const tNum = res ? res.tableNumber : selectedTableNumber;
-    const pCount = res ? res.paxCount : (extraSeat ? paxCount + 1 : paxCount);
-    const hasExtra = res ? !!res.hasExtraSeat : extraSeat;
+    const client = (res && res.clientName) ? res.clientName : (clientName.trim() || "Cliente");
+    const matchName = (res && res.gameName) ? res.gameName : (`${game.homeTeam} vs ${game.awayTeam}` || "Copaço");
+    const tType = (res && res.tableType) ? res.tableType : (tableType || "mesa4");
+    const tNum = (res && res.tableNumber) ? res.tableNumber : (selectedTableNumber || "");
+    const pCount = (res && res.paxCount) ? res.paxCount : (extraSeat ? paxCount + 1 : paxCount);
+    const hasExtra = (res && res.hasExtraSeat !== undefined) ? !!res.hasExtraSeat : extraSeat;
     
     // Explicitly determine value to make the PIX and Reservation audit airtight
     const resPrice = res ? getCreatedReservationPrice() : calculatePrice();
@@ -506,6 +525,55 @@ export default function ReservationModal({
                 <div className="bg-soccer-neon/10 border border-soccer-neon/40 text-soccer-cream p-4 rounded-xl text-xs flex items-center gap-2 mb-6">
                   <AlertTriangle className="w-4 h-4 text-soccer-neon shrink-0 animate-pulse" />
                   <span>{formError}</span>
+                </div>
+              )}
+
+              {duplicateResFound && (
+                <div className="mb-6 bg-gradient-to-br from-[#1c1404] to-[#0d0901] border border-soccer-gold p-4 md:p-5 rounded-2xl text-left shadow-2xl relative overflow-hidden animate-fade-in">
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-soccer-gold/5 blur-2xl rounded-full" />
+                  <div className="flex gap-4 items-start">
+                    <div className="bg-soccer-gold/20 p-2.5 rounded-xl text-soccer-gold h-fit shrink-0 mt-0.5 border border-soccer-gold/30">
+                      <AlertTriangle className="w-5 h-5 animate-pulse" />
+                    </div>
+                    <div className="space-y-4 text-xs text-soccer-cream w-full">
+                      <div>
+                        <p className="font-extrabold text-soccer-gold font-display uppercase tracking-wider text-[12px]">
+                          ⚠️ Identificamos uma Reserva Pendente!
+                        </p>
+                        <p className="text-soccer-cream/90 font-sans leading-relaxed mt-1 text-[12px]">
+                          Olá, <strong className="text-white">{clientName}</strong>! Já existe uma <strong className="text-soccer-gold font-bold">Mesa #{duplicateResFound.tableNumber} ({duplicateResFound.tableType === "mesa4" ? "Mesa para 4" : "Mesa para 2"} pessoas)</strong> pendente de pagamento via Pix ligada a este número de telefone para esta partida.
+                        </p>
+                        <p className="text-soccer-cream/60 text-[11px] mt-1.5 leading-normal">
+                          Para evitar duplicidade, você quer prosseguir e visualizar os dados de pagamento da sua mesa anterior, ou de fato quer ignorar e reservar mais uma nova mesa?
+                        </p>
+                      </div>
+
+                      <div className="flex flex-col sm:flex-row gap-3 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            // Go straight to payment of existing table
+                            setCreatedReservation(duplicateResFound);
+                            setStep("payment");
+                          }}
+                          className="flex-1 bg-gradient-to-r from-soccer-gold to-yellow-500 hover:from-yellow-400 hover:to-soccer-gold text-soccer-dark py-2.5 px-4 rounded-xl text-xs font-display font-black flex items-center justify-center gap-1.5 transition-all shadow-md cursor-pointer hover:scale-[1.01] active:translate-y-px"
+                        >
+                          <span>👉 Pagar/Ver Mesa #{duplicateResFound.tableNumber}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            // Let them bypass
+                            setBypassDuplicate(true);
+                            setDuplicateResFound(null);
+                          }}
+                          className="px-4 py-2.5 bg-transparent border border-soccer-cream/25 hover:border-soccer-gold hover:text-soccer-gold text-soccer-cream/75 text-[10px] uppercase font-mono rounded-xl transition-all cursor-pointer text-center"
+                        >
+                          Ignorar e Reservar Outra
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
 
