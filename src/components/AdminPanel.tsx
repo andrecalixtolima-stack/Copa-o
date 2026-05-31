@@ -2133,6 +2133,57 @@ Esperamos vocês!`;
             </div>
           </div>
 
+          {/* SUMMARY STATISTICS RIBBON */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 bg-[#03150b] p-5 rounded-2xl border border-soccer-field/90">
+            <div className="bg-[#051c0f] border border-soccer-field/50 p-4 rounded-xl flex items-center gap-3 shadow-inner">
+              <div className="w-10 h-10 rounded-lg bg-soccer-gold/15 border border-soccer-gold/30 flex items-center justify-center text-xl shrink-0">
+                🪑
+              </div>
+              <div>
+                <span className="block text-[10px] font-mono text-soccer-gold uppercase tracking-wider">Total de Mesas</span>
+                <span className="text-sm font-display font-black text-soccer-cream">
+                  {getFilteredAndSortedReservations().length} mesa{getFilteredAndSortedReservations().length !== 1 && "s"}
+                </span>
+              </div>
+            </div>
+
+            <div className="bg-[#051c0f] border border-soccer-field/50 p-4 rounded-xl flex items-center gap-3 shadow-inner">
+              <div className="w-10 h-10 rounded-lg bg-soccer-orange/15 border border-soccer-orange/30 flex items-center justify-center text-xl shrink-0 animate-pulse">
+                👥
+              </div>
+              <div>
+                <span className="block text-[10px] font-mono text-soccer-gold uppercase tracking-wider">Total de Pessoas</span>
+                <span className="text-sm font-display font-black text-soccer-gold">
+                  {getFilteredAndSortedReservations().reduce((sum, r) => sum + (r.paxCount || 0), 0)} pessoa{getFilteredAndSortedReservations().reduce((sum, r) => sum + (r.paxCount || 0), 0) !== 1 && "s"}
+                </span>
+              </div>
+            </div>
+
+            <div className="bg-[#051c0f] border border-soccer-field/50 p-4 rounded-xl flex items-center gap-3 shadow-inner">
+              <div className="w-10 h-10 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-xs font-mono font-black text-emerald-400 shrink-0">
+                M4
+              </div>
+              <div>
+                <span className="block text-[10px] font-mono text-soccer-gold uppercase tracking-wider font-semibold">Mesas de 4</span>
+                <span className="text-sm font-display font-black text-soccer-cream">
+                  {getFilteredAndSortedReservations().filter(r => r.tableType === "mesa4").length} reservada{getFilteredAndSortedReservations().filter(r => r.tableType === "mesa4").length !== 1 && "s"}
+                </span>
+              </div>
+            </div>
+
+            <div className="bg-[#051c0f] border border-soccer-field/50 p-4 rounded-xl flex items-center gap-3 shadow-inner">
+              <div className="w-10 h-10 rounded-lg bg-sky-500/10 border border-sky-500/30 flex items-center justify-center text-xs font-mono font-black text-sky-400 shrink-0">
+                M2
+              </div>
+              <div>
+                <span className="block text-[10px] font-mono text-soccer-gold uppercase tracking-wider font-semibold">Mesas de 2</span>
+                <span className="text-sm font-display font-black text-soccer-cream">
+                  {getFilteredAndSortedReservations().filter(r => r.tableType === "mesa2").length} reservada{getFilteredAndSortedReservations().filter(r => r.tableType === "mesa2").length !== 1 && "s"}
+                </span>
+              </div>
+            </div>
+          </div>
+
           {/* LIST TABLE OF RESERVATIONS */}
           <div className="overflow-x-auto bg-[#03150b] rounded-2xl border border-soccer-field shadow-lg">
             
