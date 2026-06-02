@@ -377,7 +377,8 @@ export default function ReservationModal({
       // Store timestamp to reinforce anti-spam
       localStorage.setItem("copaco_last_res_time", Date.now().toString());
 
-      setCreatedReservation(reservationData);
+      const finalRes = reservationData?.reservation || reservationData;
+      setCreatedReservation(finalRes);
 
       if (game.isBrazilGame) {
         setStep("payment");

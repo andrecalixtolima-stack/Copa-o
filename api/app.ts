@@ -275,7 +275,11 @@ app.post("/api/reservations/create", createRateLimiter(10, 5 * 60 * 1000), async
       console.error("[AUDIT LOG ERROR] Non-blocking writer:", auditErr);
     }
 
-    return res.status(200).json(reservationData);
+    return res.status(200).json({
+      success: true,
+      ok: true,
+      reservation: reservationData
+    });
   } catch (err: any) {
     console.error("[SERVER RESERVATION EXCEPTION]:", err);
     return res.status(500).json({ error: err.message || "Erro interno do servidor ao processar reserva." });
