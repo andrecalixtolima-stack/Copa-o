@@ -360,6 +360,7 @@ export default function AdminPanel({
   const [formPrice4, setFormPrice4] = useState(24);
   const [formPrice2, setFormPrice2] = useState(12);
   const [formDisableExtraSeats, setFormDisableExtraSeats] = useState(false);
+  const [formDisableReservations, setFormDisableReservations] = useState(false);
 
   // Blocking / Manual Booking states
   const [selectedGameId, setSelectedGameId] = useState("");
@@ -792,6 +793,7 @@ Esperamos vocês!`;
     setFormPrice4(24);
     setFormPrice2(12);
     setFormDisableExtraSeats(false);
+    setFormDisableReservations(false);
     setShowGameForm(true);
   };
 
@@ -819,6 +821,7 @@ Esperamos vocês!`;
     setFormPrice4(game.priceTable4);
     setFormPrice2(game.priceTable2);
     setFormDisableExtraSeats(!!game.disableExtraSeats);
+    setFormDisableReservations(!!game.disableReservations);
     setShowGameForm(true);
   };
 
@@ -845,6 +848,7 @@ Esperamos vocês!`;
         priceTable4: Number(formPrice4),
         priceTable2: Number(formPrice2),
         disableExtraSeats: !!formDisableExtraSeats,
+        disableReservations: !!formDisableReservations,
       };
 
       if (editingGame) {
@@ -1898,6 +1902,22 @@ Esperamos vocês!`;
                         Jogo Comercial Seleção Brasileira?
                       </label>
                       <span className="text-[10px] text-soccer-cream/50">Mesas para jogos do Brasil necessitam de comprovação de PIX.</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 bg-red-950/40 p-3 rounded-lg border border-red-900/40">
+                    <input
+                      id="game_disable_reservations_toggle"
+                      type="checkbox"
+                      checked={formDisableReservations}
+                      onChange={(e) => setFormDisableReservations(e.target.checked)}
+                      className="w-4 h-4 text-soccer-gold border-soccer-gold rounded focus:ring-soccer-gold"
+                    />
+                    <div>
+                      <label htmlFor="game_disable_reservations_toggle" className="block text-xs font-bold text-red-200 cursor-pointer">
+                        🚫 Bloquear Totalmente as Reservas deste Jogo (Dia)?
+                      </label>
+                      <span className="text-[10px] text-red-100/70">Se ativado, impede totalmente que qualquer cliente realize reservas de mesa para esta partida/data.</span>
                     </div>
                   </div>
 

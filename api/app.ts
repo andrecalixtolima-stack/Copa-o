@@ -187,6 +187,15 @@ app.post("/api/reservations/create", createRateLimiter(10, 5 * 60 * 1000), async
       return res.status(400).json({ error: "Dados da reserva inválidos." });
     }
 
+    // Check if reservations are fully blocked for this game/day
+    const gameDoc = await adminDb.collection("games").doc(gameId).get();
+    if (gameDoc.exists) {
+      const gameData = gameDoc.data();
+      if (gameData && gameData.disableReservations) {
+        return res.status(400).json({ error: "As reservas para esta partida do dia estão totalmente bloqueadas pelo Quinteiro." });
+      }
+    }
+
     // 1. Verify availability for all tables in parallel
     const checkPromises = tableNumbersSelected.map(async (num) => {
       const availabilityId = `${gameId}_${tableType}_${num}`;

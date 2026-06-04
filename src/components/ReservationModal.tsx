@@ -453,6 +453,32 @@ export default function ReservationModal({
     return `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(textMsg)}`;
   };
 
+  if (game.disableReservations) {
+    return (
+      <div className="fixed inset-0 z-50 overflow-y-auto bg-soccer-dark/95 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="bg-gradient-to-b from-[#051c0e] to-[#010904] border border-red-500/30 rounded-3xl w-full max-w-md p-8 text-center text-soccer-cream space-y-6 shadow-2xl relative">
+          <div className="absolute top-0 left-0 right-0 h-1.5 bg-red-600" />
+          <div className="w-16 h-16 bg-red-500/10 border border-red-500/30 rounded-full flex items-center justify-center mx-auto">
+            <Lock className="w-8 h-8 text-red-500" />
+          </div>
+          <div>
+            <h3 className="text-xl font-display font-black text-white">Reservas Bloqueadas</h3>
+            <p className="text-xs text-soccer-cream/80 mt-2 leading-relaxed">
+              As reservas de mesa para esta partida do dia estão suspensas temporariamente pela administração do Quinteiro.
+            </p>
+          </div>
+          <button
+            id="close_blocked_modal_btn"
+            onClick={onClose}
+            className="w-full py-3 bg-[#03150b] hover:bg-soccer-field border border-soccer-field/60 text-soccer-gold font-mono text-xs rounded-xl transition-all cursor-pointer font-bold"
+          >
+            Fechar Janela
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-soccer-dark/90 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="bg-gradient-to-b from-soccer-field/90 to-[#03150b] border border-soccer-gold/30 rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl relative">
@@ -1137,6 +1163,32 @@ export default function ReservationModal({
                   </div>
                 </div>
               </div>
+
+              {createdReservation && createdReservation.isSharedGroup && (
+                <div className="bg-[#042010] border border-soccer-gold/40 p-5 rounded-2xl text-left space-y-3 font-sans text-xs text-soccer-cream shadow-md">
+                  <div className="flex items-center gap-2 text-soccer-gold font-bold">
+                    <span>👑 Link de Convites de Aniversário</span>
+                  </div>
+                  <p className="text-zinc-300 text-xs leading-normal">
+                    Como você criou uma <strong>Mesa de Aniversário / Compartilhada</strong>, copie o link exclusivo abaixo e envie para os seus convidados no WhatsApp. Eles poderão confirmar presença e pagar a cadeira individual de R$ 6,00 diretamente!
+                  </p>
+                  
+                  <div className="bg-black/40 border border-soccer-field/50 p-3 rounded-xl flex items-center justify-between gap-3 font-mono text-xs">
+                    <span className="text-soccer-cream truncate select-all">{`${window.location.origin}/?aniversario=${createdReservation.id}`}</span>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(`${window.location.origin}/?aniversario=${createdReservation.id}`);
+                        setCopied(true);
+                        setTimeout(() => setCopied(false), 2000);
+                      }}
+                      className="px-3 py-1.5 bg-soccer-field text-soccer-gold hover:bg-soccer-field/80 rounded transition-all flex items-center gap-1 cursor-pointer shrink-0"
+                    >
+                      {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Clipboard className="w-3.5 h-3.5" />}
+                      <span>{copied ? "Copiado!" : "Copiar"}</span>
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Instructions and CTA buttons */}
               <div className="bg-soccer-neon/10 border border-soccer-neon/20 p-5 rounded-2xl text-xs text-left text-soccer-cream leading-relaxed space-y-2">

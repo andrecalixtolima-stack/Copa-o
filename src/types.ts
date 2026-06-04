@@ -17,6 +17,7 @@ export interface Game {
   priceTable4: number;  // default 24
   priceTable2: number;  // default 12
   disableExtraSeats?: boolean; // toggle to block individual extra seats for a game/day
+  disableReservations?: boolean; // toggle to block all reservations for this game/day
   createdAt: string;
   updatedAt: string;
 }

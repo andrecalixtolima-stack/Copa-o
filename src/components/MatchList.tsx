@@ -5,7 +5,7 @@
 
 import React from "react";
 import { Game, Reservation, BlockedTable } from "../types";
-import { Calendar, Clock, Disc, Gift, Users, Edit2, CheckCircle2, ChevronRight, Sparkles, MapPin, Star } from "lucide-react";
+import { Calendar, Clock, Disc, Gift, Users, Edit2, CheckCircle2, ChevronRight, Sparkles, MapPin, Star, Lock } from "lucide-react";
 
 interface MatchListProps {
   games: Game[];
@@ -174,6 +174,29 @@ export default function MatchList({
                   </div>
                 )}
 
+                {/* Status Ribbon: RESERVAS BLOQUEADAS */}
+                {game.disableReservations && !stats.isSoldOut && (
+                  <div className="absolute inset-0 z-20 bg-black/90 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center">
+                    <div className="bg-red-600/90 text-white text-sm font-display font-black uppercase tracking-widest px-6 py-2 rounded-xl shadow-lg border border-red-500/40 rotate-[-4deg] flex items-center gap-1.5">
+                      <Lock className="w-4 h-4 text-white" />
+                      RESERVAS BLOQUEADAS
+                    </div>
+                    <p className="text-soccer-cream/85 text-xs mt-3 font-mono">
+                      As reservas para esta partida do dia estão totalmente suspensas pelo Quinteiro.
+                    </p>
+                    {isAdmin && onEditGame && (
+                      <button
+                        id={`edit_game_blocked_btn_${game.id}`}
+                        onClick={() => onEditGame(game)}
+                        className="mt-4 flex items-center gap-1 px-4 py-2 bg-[#dc2626]/30 hover:bg-[#dc2626]/50 text-red-200 font-mono text-xs rounded-lg transition-transform"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                        Painel do Jogo
+                      </button>
+                    )}
+                  </div>
+                )}
+
               <div className="flex flex-col sm:flex-row h-full">
                 
                 {/* Visual Banner Left */}
@@ -287,14 +310,24 @@ export default function MatchList({
 
                     {/* Operational Action Buttons */}
                     <div className="flex items-center gap-2">
-                      <button
-                        id={`reserve_btn_${game.id}`}
-                        onClick={() => onSelectGame(game)}
-                        className="flex-1 bg-gradient-to-r from-soccer-gold to-yellow-500 hover:from-yellow-500 hover:to-soccer-orange text-soccer-dark px-4 py-2.5 rounded-xl text-xs font-semibold tracking-wide flex items-center justify-center gap-1.5 transition-all shadow-lg active:scale-[0.98] cursor-pointer"
-                      >
-                        <span>Reservar Mesa</span>
-                        <ChevronRight className="w-3.5 h-3.5 text-soccer-dark" />
-                      </button>
+                      {game.disableReservations ? (
+                        <button
+                          disabled
+                          className="flex-1 bg-zinc-800 text-zinc-500 border border-zinc-700/50 px-4 py-2.5 rounded-xl text-xs font-semibold tracking-wide flex items-center justify-center gap-1.5 cursor-not-allowed opacity-60"
+                        >
+                          <Lock className="w-3.5 h-3.5 text-zinc-500" />
+                          <span>Reservas Bloqueadas</span>
+                        </button>
+                      ) : (
+                        <button
+                          id={`reserve_btn_${game.id}`}
+                          onClick={() => onSelectGame(game)}
+                          className="flex-1 bg-gradient-to-r from-soccer-gold to-yellow-500 hover:from-yellow-500 hover:to-soccer-orange text-soccer-dark px-4 py-2.5 rounded-xl text-xs font-semibold tracking-wide flex items-center justify-center gap-1.5 transition-all shadow-lg active:scale-[0.98] cursor-pointer"
+                        >
+                          <span>Reservar Mesa</span>
+                          <ChevronRight className="w-3.5 h-3.5 text-soccer-dark" />
+                        </button>
+                      )}
 
                       {isAdmin && onEditGame && (
                         <button
