@@ -29,15 +29,17 @@ if (admin.apps.length === 0) {
         privateKey = privateKey.slice(1, -1).trim();
       }
 
-      // Replace literal escaped sequence \n and double escaped \\n with actual raw line-breaks
-      privateKey = privateKey.replace(/\\n/g, "\n").replace(/\\\\n/g, "\n");
+      // Replace literal escaped sequence \n and double escaped \\n with actual raw line-breaks in a highly robust way.
+      // We target any single or multiple backslashes preceding 'n' or 'r' to prevent trailing backslash errors.
+      privateKey = privateKey.replace(/\\+r/g, "").replace(/\\+n/g, "\n");
 
       // Standardize the PEM certificate format. Often env managers flatten private keys, replacing 
       // newlines with single spaces, or introducing weird wrapping. Reformat if headers/footers exist.
       const boundaryMatch = privateKey.match(/(-----BEGIN [A-Z ]+-----)([\s\S]*?)(-----END [A-Z ]+-----)/);
       if (boundaryMatch) {
         const beginBoundary = boundaryMatch[1];
-        const base64Content = boundaryMatch[2].replace(/[\s\r\n]+/g, ""); // strip all whitespaces, tabs, newlines
+        // Strip any characters that are NOT valid base64 (removes extra whitespaces, backslashes, quotes)
+        const base64Content = boundaryMatch[2].replace(/[^A-Za-z0-9+/=]+/g, "");
         const endBoundary = boundaryMatch[3];
 
         // Format to exactly 64 characters per line as Node’s crypto/DECODER routines strictly require

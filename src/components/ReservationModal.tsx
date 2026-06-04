@@ -1164,7 +1164,7 @@ export default function ReservationModal({
                 </div>
               </div>
 
-              {createdReservation && createdReservation.isSharedGroup && (
+              {createdReservation && (createdReservation.isSharedGroup || isSharedGroup) && (
                 <div className="bg-[#042010] border border-soccer-gold/40 p-5 rounded-2xl text-left space-y-3 font-sans text-xs text-soccer-cream shadow-md">
                   <div className="flex items-center gap-2 text-soccer-gold font-bold">
                     <span>👑 Link de Convites de Aniversário</span>
@@ -1293,7 +1293,7 @@ export default function ReservationModal({
                 </div>
               )}
 
-              {createdReservation && createdReservation.isSharedGroup && (
+              {createdReservation && (createdReservation.isSharedGroup || isSharedGroup) && (
                 <div className="bg-[#042010] border border-soccer-gold/40 p-5 rounded-2xl text-left space-y-3 font-sans text-xs text-soccer-cream shadow-md">
                   <div className="flex items-center gap-2 text-soccer-gold font-bold">
                     <span>👑 Link de Convites de Aniversário</span>
