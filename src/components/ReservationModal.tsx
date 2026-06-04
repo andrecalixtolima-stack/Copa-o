@@ -471,11 +471,20 @@ export default function ReservationModal({
             </p>
           </div>
           
-          <div className="bg-amber-500/10 border border-soccer-gold/30 p-4 rounded-xl text-left space-y-1">
-            <span className="block text-soccer-gold text-xs font-bold font-sans">🎟️ Venda na Portaria:</span>
-            <p className="text-soccer-cream/90 text-xs leading-relaxed">
-              Teremos venda de ingresso individual diretamente na portaria do evento no dia do jogo físico por <strong className="text-soccer-gold">R$ 10,00</strong>. Sujeito à lotação máxima do espaço! Chegue cedo para garantir seu lugar.
-            </p>
+          <div className="bg-amber-500/10 border border-soccer-gold/30 p-4 rounded-xl text-left space-y-3">
+            <div>
+              <span className="block text-soccer-gold text-xs font-bold font-sans">🎟️ Venda na Portaria (Área do Telão):</span>
+              <p className="text-soccer-cream/90 text-xs leading-relaxed mt-0.5">
+                Teremos venda de ingresso individual diretamente na portaria do evento no dia do jogo físico por <strong className="text-soccer-gold">R$ 10,00</strong>. Sujeito à lotação máxima do espaço (chegue cedo!).
+              </p>
+            </div>
+            
+            <div className="border-t border-soccer-gold/20 pt-2.5">
+              <span className="block text-soccer-neon text-xs font-bold font-sans">📺 Transmissão Gratuita (Lounge & Telas Externas):</span>
+              <p className="text-soccer-cream/90 text-xs leading-relaxed mt-0.5">
+                Você também pode curtir em nossas áreas externas (fora do espaço do telão principal), equipadas com TVs transmitindo a partida completa de forma <strong className="text-soccer-neon">100% gratuita</strong>!
+              </p>
+            </div>
           </div>
 
           <button

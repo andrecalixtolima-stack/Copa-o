@@ -184,14 +184,22 @@ export default function MatchList({
                     <div className="text-white font-display font-black text-sm tracking-wide mt-3 uppercase">
                       {game.homeTeam} x {game.awayTeam}
                     </div>
-                    <p className="text-soccer-cream/85 text-xs mt-2 max-w-xs font-mono">
+                    <p className="text-soccer-cream/85 text-[11px] mt-2 max-w-xs font-mono leading-relaxed">
                       As reservas antecipadas de mesa para esta partida do dia estão esgotadas.
                     </p>
-                    <div className="mt-3.5 bg-amber-500/10 border border-soccer-gold/30 p-3 rounded-xl max-w-xs text-left">
-                      <span className="block text-soccer-gold text-xs font-bold mb-1">🎟️ Entrada na Portaria:</span>
-                      <p className="text-soccer-cream/90 text-[11px] leading-relaxed">
-                        Teremos venda de ingresso individual diretamente na portaria no dia por <strong className="text-soccer-gold">R$ 10,00</strong>, sujeito à lotação do estabelecimento. Chegue cedo!
-                      </p>
+                    <div className="mt-3 bg-amber-500/10 border border-soccer-gold/30 p-3 rounded-xl max-w-xs text-left space-y-2">
+                      <div>
+                        <span className="block text-soccer-gold text-[11px] font-bold mb-0.5">🎟️ PORTARIA (ÁREA DO TELÃO):</span>
+                        <p className="text-soccer-cream/90 text-[10px] leading-snug">
+                          Ingresso individual na portaria por <strong className="text-soccer-gold">R$ 10,00</strong>, sujeito à lotação.
+                        </p>
+                      </div>
+                      <div className="border-t border-soccer-gold/10 pt-1.5">
+                        <span className="block text-soccer-neon text-[11px] font-bold mb-0.5">📺 ÁREAS EXTERNAS (GRATUITO):</span>
+                        <p className="text-soccer-cream/90 text-[10px] leading-snug">
+                          Existem áreas fora do telão principal com TVs que irão transmitir os jogos com <strong className="text-soccer-neon">entrada gratuita</strong>!
+                        </p>
+                      </div>
                     </div>
                     {isAdmin && onEditGame && (
                       <button
