@@ -462,12 +462,12 @@ export default function ReservationModal({
             <Lock className="w-8 h-8 text-red-500" />
           </div>
           <div className="space-y-2">
-            <h3 className="text-xl font-display font-black text-white">Reservas Bloqueadas</h3>
+            <h3 className="text-xl font-display font-black text-white">Reservas Antecipadas Esgotadas</h3>
             <div className="text-soccer-gold font-display font-bold text-sm tracking-wide uppercase">
               {game.homeTeam} x {game.awayTeam}
             </div>
             <p className="text-xs text-soccer-cream/80 leading-relaxed">
-              As reservas de mesa para esta partida do dia estão suspensas temporariamente pela administração do Quinteiro.
+              As reservas antecipadas de mesa para esta partida do dia estão esgotadas.
             </p>
           </div>
           

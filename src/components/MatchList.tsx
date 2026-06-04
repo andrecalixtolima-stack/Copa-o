@@ -174,18 +174,18 @@ export default function MatchList({
                   </div>
                 )}
 
-                {/* Status Ribbon: RESERVAS BLOQUEADAS */}
+                {/* Status Ribbon: RESERVAS ANTECIPADAS ESGOTADAS */}
                 {game.disableReservations && !stats.isSoldOut && (
                   <div className="absolute inset-0 z-20 bg-black/90 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center">
                     <div className="bg-red-600/90 text-white text-sm font-display font-black uppercase tracking-widest px-6 py-2 rounded-xl shadow-lg border border-red-500/40 rotate-[-4deg] flex items-center gap-1.5">
                       <Lock className="w-4 h-4 text-white" />
-                      RESERVAS BLOQUEADAS
+                      RESERVAS ANTECIPADAS ESGOTADAS
                     </div>
                     <div className="text-white font-display font-black text-sm tracking-wide mt-3 uppercase">
                       {game.homeTeam} x {game.awayTeam}
                     </div>
                     <p className="text-soccer-cream/85 text-xs mt-2 max-w-xs font-mono">
-                      As reservas para esta partida do dia estão totalmente suspensas pelo Quinteiro.
+                      As reservas antecipadas de mesa para esta partida do dia estão esgotadas.
                     </p>
                     <div className="mt-3.5 bg-amber-500/10 border border-soccer-gold/30 p-3 rounded-xl max-w-xs text-left">
                       <span className="block text-soccer-gold text-xs font-bold mb-1">🎟️ Entrada na Portaria:</span>
@@ -325,7 +325,7 @@ export default function MatchList({
                           className="flex-1 bg-zinc-800 text-zinc-500 border border-zinc-700/50 px-4 py-2.5 rounded-xl text-xs font-semibold tracking-wide flex items-center justify-center gap-1.5 cursor-not-allowed opacity-60"
                         >
                           <Lock className="w-3.5 h-3.5 text-zinc-500" />
-                          <span>Reservas Bloqueadas</span>
+                          <span>Reservas Antecipadas Esgotadas</span>
                         </button>
                       ) : (
                         <button
