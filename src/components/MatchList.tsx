@@ -181,9 +181,18 @@ export default function MatchList({
                       <Lock className="w-4 h-4 text-white" />
                       RESERVAS BLOQUEADAS
                     </div>
-                    <p className="text-soccer-cream/85 text-xs mt-3 font-mono">
+                    <div className="text-white font-display font-black text-sm tracking-wide mt-3 uppercase">
+                      {game.homeTeam} x {game.awayTeam}
+                    </div>
+                    <p className="text-soccer-cream/85 text-xs mt-2 max-w-xs font-mono">
                       As reservas para esta partida do dia estão totalmente suspensas pelo Quinteiro.
                     </p>
+                    <div className="mt-3.5 bg-amber-500/10 border border-soccer-gold/30 p-3 rounded-xl max-w-xs text-left">
+                      <span className="block text-soccer-gold text-xs font-bold mb-1">🎟️ Entrada na Portaria:</span>
+                      <p className="text-soccer-cream/90 text-[11px] leading-relaxed">
+                        Teremos venda de ingresso individual diretamente na portaria no dia por <strong className="text-soccer-gold">R$ 10,00</strong>, sujeito à lotação do estabelecimento. Chegue cedo!
+                      </p>
+                    </div>
                     {isAdmin && onEditGame && (
                       <button
                         id={`edit_game_blocked_btn_${game.id}`}

@@ -461,16 +461,27 @@ export default function ReservationModal({
           <div className="w-16 h-16 bg-red-500/10 border border-red-500/30 rounded-full flex items-center justify-center mx-auto">
             <Lock className="w-8 h-8 text-red-500" />
           </div>
-          <div>
+          <div className="space-y-2">
             <h3 className="text-xl font-display font-black text-white">Reservas Bloqueadas</h3>
-            <p className="text-xs text-soccer-cream/80 mt-2 leading-relaxed">
+            <div className="text-soccer-gold font-display font-bold text-sm tracking-wide uppercase">
+              {game.homeTeam} x {game.awayTeam}
+            </div>
+            <p className="text-xs text-soccer-cream/80 leading-relaxed">
               As reservas de mesa para esta partida do dia estão suspensas temporariamente pela administração do Quinteiro.
             </p>
           </div>
+          
+          <div className="bg-amber-500/10 border border-soccer-gold/30 p-4 rounded-xl text-left space-y-1">
+            <span className="block text-soccer-gold text-xs font-bold font-sans">🎟️ Venda na Portaria:</span>
+            <p className="text-soccer-cream/90 text-xs leading-relaxed">
+              Teremos venda de ingresso individual diretamente na portaria do evento no dia do jogo físico por <strong className="text-soccer-gold">R$ 10,00</strong>. Sujeito à lotação máxima do espaço! Chegue cedo para garantir seu lugar.
+            </p>
+          </div>
+
           <button
             id="close_blocked_modal_btn"
             onClick={onClose}
-            className="w-full py-3 bg-[#03150b] hover:bg-soccer-field border border-soccer-field/60 text-soccer-gold font-mono text-xs rounded-xl transition-all cursor-pointer font-bold"
+            className="w-full py-3 bg-[#03150b] hover:bg-soccer-field border border-soccer-field/60 text-soccer-gold font-mono text-xs rounded-xl transition-all cursor-pointer font-bold animate-pulse"
           >
             Fechar Janela
           </button>
