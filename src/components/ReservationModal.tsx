@@ -36,7 +36,18 @@ export default function ReservationModal({
   const [nickname, setNickname] = useState(""); // Honeypot spam defense
   const [paxCount, setPaxCount] = useState<number>(4);
   const [tableType, setTableType] = useState<"mesa4" | "mesa2">("mesa4");
-  const [selectedTableNumber, setSelectedTableNumber] = useState<number | null>(null);
+  const [selectedTableNumbers, setSelectedTableNumbers] = useState<number[]>([]);
+  const selectedTableNumber = selectedTableNumbers[0] || null;
+  const setSelectedTableNumber = (value: number | null | ((prev: number | null) => number | null)) => {
+    if (value === null) {
+      setSelectedTableNumbers([]);
+    } else if (typeof value === "function") {
+      const next = value(selectedTableNumbers[0] || null);
+      setSelectedTableNumbers(next === null ? [] : [next]);
+    } else {
+      setSelectedTableNumbers([value]);
+    }
+  };
   const [extraSeat, setExtraSeat] = useState(false);
 
   const [loading, setLoading] = useState(false);
@@ -65,13 +76,14 @@ export default function ReservationModal({
   
   const blockedForGame = blockedTables.filter(b => b.gameId === game.id);
 
-  // When pax changes, auto limit tableType compatibility
+  // When pax changes, auto limit tableType compatibility if selecting only 1 table
   useEffect(() => {
-    if (paxCount > 2 && tableType === "mesa2") {
+    const numTables = Math.max(1, selectedTableNumbers.length);
+    if (paxCount > numTables * 2 && tableType === "mesa2" && selectedTableNumbers.length <= 1) {
       setTableType("mesa4");
-      setSelectedTableNumber(null);
+      setSelectedTableNumbers([]);
     }
-  }, [paxCount, tableType]);
+  }, [paxCount, tableType, selectedTableNumbers]);
 
   // Visual helper lists of table numbers
   const mesa4Numbers = Array.from({ length: game.tablesTotal4 }, (_, i) => i + 1); // 1 to 30
@@ -94,13 +106,17 @@ export default function ReservationModal({
   const calculatePrice = () => {
     if (!game.isBrazilGame) return 0;
     const basePrice = tableType === "mesa4" ? (game.priceTable4 || 24) : (game.priceTable2 || 12);
-    return extraSeat ? (basePrice + 6) : basePrice;
+    const count = Math.max(1, selectedTableNumbers.length);
+    return extraSeat ? (basePrice * count + 6) : (basePrice * count);
   };
 
   const getCreatedReservationPrice = () => {
     if (!createdReservation) return calculatePrice();
     const basePrice = createdReservation.tableType === "mesa4" ? (game.priceTable4 || 24) : (game.priceTable2 || 12);
-    return createdReservation.hasExtraSeat ? (basePrice + 6) : basePrice;
+    const count = (createdReservation as any).tableNumbers && (createdReservation as any).tableNumbers.length > 0
+      ? (createdReservation as any).tableNumbers.length
+      : 1;
+    return createdReservation.hasExtraSeat ? (basePrice * count + 6) : (basePrice * count);
   };
 
   const handleCardPaymentSubmit = async (e: React.FormEvent) => {
@@ -273,7 +289,7 @@ export default function ReservationModal({
       setFormError("Por favor, informe seu telefone / WhatsApp de contato.");
       return;
     }
-    if (!selectedTableNumber) {
+    if (selectedTableNumbers.length === 0) {
       setFormError("Por favor, selecione uma mesa disponível no mapa.");
       return;
     }
@@ -301,18 +317,21 @@ export default function ReservationModal({
       return;
     }
 
-    if (paxCount > 2 && tableType === "mesa2") {
+    // Validate single table limit for mesa2 if needed
+    if (selectedTableNumbers.length === 1 && paxCount > 2 && tableType === "mesa2") {
       setFormError("Reservas de 2 lugares comportam no máximo 2 pessoas.");
       return;
     }
 
-    if (isTableOccupied(tableType, selectedTableNumber)) {
-      setFormError("Essa mesa já foi reservada por outro cliente. Escolha outro número.");
+    const occupiedTable = selectedTableNumbers.find(num => isTableOccupied(tableType, num));
+    if (occupiedTable) {
+      setFormError(`A mesa #${occupiedTable} já se encontra reservada por outro cliente. Escolha outro número.`);
       return;
     }
 
-    if (isTableBlocked(tableType, selectedTableNumber)) {
-      setFormError("Essa mesa encontra-se bloqueada administrativamente.");
+    const blockedTable = selectedTableNumbers.find(num => isTableBlocked(tableType, num));
+    if (blockedTable) {
+      setFormError(`A mesa #${blockedTable} encontra-se bloqueada administrativamente.`);
       return;
     }
 
@@ -334,7 +353,8 @@ export default function ReservationModal({
           clientPhone: clientPhone.trim(),
           paxCount: extraSeat ? (paxCount + 1) : paxCount,
           tableType: tableType,
-          tableNumber: selectedTableNumber,
+          tableNumber: selectedTableNumbers[0], // First table number for backwards compatibility
+          tableNumbers: selectedTableNumbers,   // Complete array of chosen tables
           hasExtraSeat: extraSeat
         })
       });
@@ -400,7 +420,16 @@ export default function ReservationModal({
     const client = (res && res.clientName) ? res.clientName : (clientName.trim() || "Cliente");
     const matchName = (res && res.gameName) ? res.gameName : (`${game.homeTeam} vs ${game.awayTeam}` || "Copaço");
     const tType = (res && res.tableType) ? res.tableType : (tableType || "mesa4");
-    const tNum = (res && res.tableNumber) ? res.tableNumber : (selectedTableNumber || "");
+    
+    // Support printing list of tables
+    const listTableNumbers = (res && (res as any).tableNumbers) 
+      ? (res as any).tableNumbers 
+      : selectedTableNumbers;
+    
+    const tablesLabel = listTableNumbers.length > 1
+      ? `Mesas Reservadas: #${listTableNumbers.join(", #")}`
+      : `Mesa Reservada: #${listTableNumbers[0] || selectedTableNumbers[0] || ""}`;
+
     const pCount = (res && res.paxCount) ? res.paxCount : (extraSeat ? paxCount + 1 : paxCount);
     const hasExtra = (res && res.hasExtraSeat !== undefined) ? !!res.hasExtraSeat : extraSeat;
     
@@ -408,7 +437,7 @@ export default function ReservationModal({
     const resPrice = res ? getCreatedReservationPrice() : calculatePrice();
     const extraLabel = hasExtra ? " (com 1 cadeira/ingresso extra individual)" : "";
     
-    const textMsg = `Olá! Acabei de fazer minha reserva para o COPAÇO no Quinteiro e estou enviando meu comprovante de pagamento.\n\n*Resumo da Reserva*:\nCliente: ${client}\nJogo: ${matchName}\nMesa Reservada: ${tType === "mesa4" ? "Mesa para 4 pessoas" : "Mesa para 2 pessoas"} - Número #${tNum}${extraLabel}\nQuantidade de pessoas: ${pCount} pessoas\nValor total via PIX: R$ ${resPrice},00\n\nAguardando confirmação!`;
+    const textMsg = `Olá! Acabei de fazer minha reserva para o COPAÇO no Quinteiro e estou enviando meu comprovante de pagamento.\n\n*Resumo da Reserva*:\nCliente: ${client}\nJogo: ${matchName}\n${tablesLabel} (${tType === "mesa4" ? "Mesa para 4 pessoas" : "Mesa para 2 pessoas"})${extraLabel}\nQuantidade de pessoas: ${pCount} pessoas\nValor total via PIX: R$ ${resPrice},00\n\nAguardando confirmação!`;
     return `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(textMsg)}`;
   };
 
@@ -652,10 +681,15 @@ export default function ReservationModal({
                           onChange={(e) => setPaxCount(Number(e.target.value))}
                           className="w-full bg-[#041a0d] border border-soccer-field/50 focus:border-soccer-gold text-soccer-cream rounded-xl py-2.5 pl-10 pr-4 text-xs outline-none transition-all appearance-none cursor-pointer"
                         >
-                          <option value={1}>1 Pessoa</option>
-                          <option value={2}>2 Pessoas</option>
-                          <option value={3}>3 Pessoas</option>
-                          <option value={4}>4 Pessoas</option>
+                          {Array.from({ 
+                            length: tableType === "mesa4" 
+                              ? Math.max(1, selectedTableNumbers.length) * 4 
+                              : Math.max(1, selectedTableNumbers.length) * 2 
+                          }, (_, idx) => idx + 1).map((val) => (
+                            <option key={`pax_option_${val}`} value={val}>
+                              {val} {val === 1 ? "Pessoa" : "Pessoas"}
+                            </option>
+                          ))}
                         </select>
                       </div>
                     </div>
@@ -704,17 +738,26 @@ export default function ReservationModal({
                       </div>
                       <div className="flex justify-between">
                         <span className="text-soccer-cream/50">Designação:</span>
-                        <span className="text-soccer-cream font-mono font-bold">
-                          {selectedTableNumber ? `#${selectedTableNumber}` : "Não selecionada"}
+                        <span className="text-soccer-cream font-mono font-bold text-right max-w-[150px] truncate">
+                          {selectedTableNumbers.length > 0 
+                            ? selectedTableNumbers.map(n => `#${n}`).join(", ") 
+                            : "Não selecionada"
+                          }
                         </span>
                       </div>
                       <div className="border-t border-soccer-field mt-3 pt-3 space-y-1.5 text-right flex flex-col items-end">
                         <div className="flex justify-between w-full items-center">
-                          <span className="text-xs font-display font-medium text-soccer-cream/70">Mesa (Antecipado):</span>
+                          <span className="text-xs font-display font-medium text-soccer-cream/70">
+                            {selectedTableNumbers.length > 1 
+                              ? `${selectedTableNumbers.length}x Mesas (Antecipado):` 
+                              : "Mesa (Antecipado):"
+                            }
+                          </span>
                           <span className="text-sm font-display font-black text-soccer-cream font-mono">
-                            {tableType === "mesa4" 
-                              ? `R$ ${game.priceTable4 || 24},00` 
-                              : `R$ ${game.priceTable2 || 12},00`}
+                            {selectedTableNumbers.length > 1
+                              ? `${selectedTableNumbers.length}x R$ ${tableType === "mesa4" ? (game.priceTable4 || 24) : (game.priceTable2 || 12)},00 = R$ ${(tableType === "mesa4" ? (game.priceTable4 || 24) : (game.priceTable2 || 12)) * selectedTableNumbers.length},00`
+                              : `R$ ${tableType === "mesa4" ? (game.priceTable4 || 24) : (game.priceTable2 || 12)},00`
+                            }
                           </span>
                         </div>
                         {extraSeat && (
@@ -747,7 +790,7 @@ export default function ReservationModal({
                       </div>
                     )}
 
-                    {selectedTableNumber && (
+                    {selectedTableNumbers.length > 0 && (
                       <div className="bg-amber-500/10 border border-amber-500/30 p-3.5 rounded-xl text-[10px] text-amber-200 mt-3 leading-relaxed">
                         <div className="flex gap-2">
                           <AlertTriangle className="w-4 h-4 text-soccer-orange shrink-0 mt-0.5" />
@@ -855,7 +898,7 @@ export default function ReservationModal({
                           {mesa4Numbers.map((num) => {
                             const occupied = isTableOccupied("mesa4", num);
                             const blocked = isTableBlocked("mesa4", num);
-                            const selected = selectedTableNumber === num;
+                            const selected = selectedTableNumbers.includes(num);
 
                             let btnStyle = "bg-[#0e6e30] text-white border border-[#0c5324] hover:bg-[#0b5425] hover:scale-105 cursor-pointer shadow-sm";
                             if (occupied) {
@@ -872,7 +915,13 @@ export default function ReservationModal({
                                 id={`mesa4_select_btn_${num}`}
                                 type="button"
                                 disabled={occupied || blocked}
-                                onClick={() => setSelectedTableNumber(num)}
+                                onClick={() => {
+                                  if (selected) {
+                                    setSelectedTableNumbers(prev => prev.filter(n => n !== num));
+                                  } else {
+                                    setSelectedTableNumbers(prev => [...prev, num]);
+                                  }
+                                }}
                                 className={`h-11 rounded-xl border text-xs flex flex-col items-center justify-center transition-all ${btnStyle}`}
                               >
                                 <span className="font-mono text-xs">M4</span>
@@ -897,7 +946,7 @@ export default function ReservationModal({
                           {mesa2Numbers.map((num) => {
                             const occupied = isTableOccupied("mesa2", num);
                             const blocked = isTableBlocked("mesa2", num);
-                            const selected = selectedTableNumber === num;
+                            const selected = selectedTableNumbers.includes(num);
 
                             let btnStyle = "bg-[#0e6e30] text-white border border-[#0c5324] hover:bg-[#0b5425] hover:scale-105 cursor-pointer shadow-sm";
                             if (occupied) {
@@ -914,7 +963,13 @@ export default function ReservationModal({
                                 id={`mesa2_select_btn_${num}`}
                                 type="button"
                                 disabled={occupied || blocked}
-                                onClick={() => setSelectedTableNumber(num)}
+                                onClick={() => {
+                                  if (selected) {
+                                    setSelectedTableNumbers(prev => prev.filter(n => n !== num));
+                                  } else {
+                                    setSelectedTableNumbers(prev => [...prev, num]);
+                                  }
+                                }}
                                 className={`h-14 rounded-xl border text-xs flex flex-col items-center justify-center transition-all ${btnStyle}`}
                               >
                                 <span className="font-mono text-xs">M2</span>
@@ -1022,7 +1077,10 @@ export default function ReservationModal({
                     <span className="font-display text-lg text-soccer-cream font-extrabold">R$ {getCreatedReservationPrice()},00</span>
                   </div>
                   <div className="text-right text-[10px] text-soccer-cream/50">
-                    Mesa #{createdReservation ? createdReservation.tableNumber : selectedTableNumber}<br />
+                    {createdReservation && (createdReservation as any).tableNumbers && (createdReservation as any).tableNumbers.length > 1
+                      ? `Mesas: #${(createdReservation as any).tableNumbers.join(", #")}`
+                      : `Mesa #${createdReservation ? createdReservation.tableNumber : (selectedTableNumbers.length > 0 ? selectedTableNumbers.join(", #") : "1")}`
+                    }<br />
                     Para {createdReservation ? createdReservation.paxCount : (extraSeat ? paxCount + 1 : paxCount)} pessoas {(createdReservation?.hasExtraSeat || (!createdReservation && extraSeat)) ? "(Ímpar)" : ""}
                   </div>
                 </div>
@@ -1092,8 +1150,12 @@ export default function ReservationModal({
                   </div>
                   <div className="flex justify-between">
                     <span className="text-soccer-cream/50">Mesa Reservada:</span>
-                    <span className="text-soccer-gold font-bold">
-                      {createdReservation.tableType === "mesa4" ? "Mesa para 4 Pessoas" : "Mesa para 2 Pessoas"} - Número #{createdReservation.tableNumber}
+                    <span className="text-soccer-gold font-bold text-right max-w-[220px] truncate">
+                      {createdReservation.tableType === "mesa4" ? "Mesa para 4 Pessoas" : "Mesa para 2 Pessoas"} - {
+                        (createdReservation as any).tableNumbers && (createdReservation as any).tableNumbers.length > 1
+                          ? `Números: #${(createdReservation as any).tableNumbers.join(", #")}`
+                          : `Número: #${createdReservation.tableNumber}`
+                      }
                     </span>
                   </div>
                   {createdReservation.hasExtraSeat && (

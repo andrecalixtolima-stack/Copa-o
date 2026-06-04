@@ -174,28 +174,40 @@ app.post("/api/reservations/create", createRateLimiter(10, 5 * 60 * 1000), async
     const { 
       gameId, gameName, gameDateTime, isBrazilGame, 
       clientName, clientPhone, paxCount, tableType, tableNumber,
-      paymentMethod, paymentId, status, hasExtraSeat
+      paymentMethod, paymentId, status, hasExtraSeat, tableNumbers
     } = req.body;
 
-    console.log(`[EXPRESS RESERVATION] Table #${tableNumber} for Game: ${gameName}. Client: ${clientName}`);
+    // Support both single tableNumber and multi-selection array tableNumbers
+    const rawNumbers = tableNumbers || (Array.isArray(tableNumber) ? tableNumber : [tableNumber]);
+    const tableNumbersSelected: number[] = Array.isArray(rawNumbers) ? rawNumbers.map(Number) : [Number(tableNumber)];
 
-    if (!gameId || !clientName || !clientPhone || !selectedTableValid(tableNumber)) {
+    console.log(`[EXPRESS RESERVATION] Tables #${tableNumbersSelected.join(", ")} for Game: ${gameName}. Client: ${clientName}`);
+
+    if (!gameId || !clientName || !clientPhone || tableNumbersSelected.length === 0 || tableNumbersSelected.some(n => !selectedTableValid(n))) {
       return res.status(400).json({ error: "Dados da reserva inválidos." });
     }
 
-    const availabilityId = `${gameId}_${tableType}_${tableNumber}`;
+    // 1. Verify availability for all tables in parallel
+    const checkPromises = tableNumbersSelected.map(async (num) => {
+      const availabilityId = `${gameId}_${tableType}_${num}`;
+      const availRef = adminDb.collection("availability").doc(availabilityId);
+      const blockRef = adminDb.collection("blockedTables").doc(availabilityId);
+      const [availSnap, blockSnap] = await Promise.all([availRef.get(), blockRef.get()]);
+      return {
+        num,
+        occupied: availSnap.exists,
+        blocked: blockSnap.exists
+      };
+    });
 
-    // 1. Transactionally verify availability on server to prevent front-end race conditions
-    const availRef = adminDb.collection("availability").doc(availabilityId);
-    const blockRef = adminDb.collection("blockedTables").doc(availabilityId);
-
-    const [availSnap, blockSnap] = await Promise.all([availRef.get(), blockRef.get()]);
-
-    if (availSnap.exists) {
-      return res.status(400).json({ error: "Esta mesa já se encontra ocupada no sistema." });
+    const results = await Promise.all(checkPromises);
+    const occupied = results.find(r => r.occupied);
+    if (occupied) {
+      return res.status(400).json({ error: `A mesa #${occupied.num} já se encontra ocupada no sistema.` });
     }
-    if (blockSnap.exists) {
-      return res.status(400).json({ error: "Esta mesa está bloqueada pela administração." });
+    const blocked = results.find(r => r.blocked);
+    if (blocked) {
+      return res.status(400).json({ error: `A mesa #${blocked.num} está bloqueada pela administração.` });
     }
 
     // 1.5. Validate maximum day capacity of 124 chairs
@@ -218,46 +230,79 @@ app.post("/api/reservations/create", createRateLimiter(10, 5 * 60 * 1000), async
     }
 
     // 2. Construct payloads and write atomically
-    const resId = adminDb.collection("reservations").doc().id;
+    const batch = adminDb.batch();
+    const timestamp = new Date().toISOString();
     
     // Default to 'confirmado' for PagSeguro or non-Brazil games, otherwise 'aguardando comprovante'
     const initialStatus = status || (paymentMethod === "pagseguro" ? "confirmado" : (isBrazilGame ? "aguardando comprovante" : "confirmado"));
-    const timestamp = new Date().toISOString();
+    
+    const itemsCreated: any[] = [];
+    const groupResId = adminDb.collection("reservations").doc().id;
+    let totalAssigned = 0;
 
-    const reservationData = {
-      id: resId,
-      gameId,
-      gameName,
-      gameDateTime,
-      isBrazilGame: !!isBrazilGame,
-      clientName: clientName.trim(),
-      clientPhone: clientPhone.trim(),
-      paxCount: Number(paxCount),
-      tableType,
-      tableNumber: Number(tableNumber),
-      status: initialStatus,
-      hasExtraSeat: !!hasExtraSeat,
-      paymentMethod: paymentMethod || (isBrazilGame ? "pix" : "gratis"),
-      paymentId: paymentId || "",
-      createdAt: timestamp,
-      updatedAt: timestamp
-    };
+    for (let i = 0; i < tableNumbersSelected.length; i++) {
+      const num = tableNumbersSelected[i];
+      const resId = i === 0 ? groupResId : adminDb.collection("reservations").doc().id;
+      
+      const capacity = tableType === "mesa4" ? 4 : 2;
+      let indPax = 0;
+      if (tableNumbersSelected.length === 1) {
+        indPax = Number(paxCount);
+      } else {
+        const left = Number(paxCount) - totalAssigned;
+        indPax = Math.min(left, capacity);
+        if (i === tableNumbersSelected.length - 1 && left > capacity) {
+          indPax = left;
+        }
+        totalAssigned += indPax;
+      }
 
-    const availabilityData = {
-      reservationId: resId,
-      gameId,
-      gameName,
-      clientName: clientName.trim(),
-      clientPhone: clientPhone.trim(),
-      tableType,
-      tableNumber: Number(tableNumber),
-      status: initialStatus,
-      updatedAt: timestamp
-    };
+      if (indPax <= 0) {
+        indPax = 1;
+      }
 
-    const batch = adminDb.batch();
-    batch.set(adminDb.collection("reservations").doc(resId), reservationData);
-    batch.set(availRef, availabilityData);
+      const reservationData = {
+        id: resId,
+        gameId,
+        gameName,
+        gameDateTime,
+        isBrazilGame: !!isBrazilGame,
+        clientName: clientName.trim(),
+        clientPhone: clientPhone.trim(),
+        paxCount: indPax,
+        tableType,
+        tableNumber: Number(num),
+        status: initialStatus,
+        hasExtraSeat: i === 0 ? !!hasExtraSeat : false,
+        paymentMethod: paymentMethod || (isBrazilGame ? "pix" : "gratis"),
+        paymentId: paymentId || "",
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        groupId: groupResId,
+        tableNumbers: tableNumbersSelected
+      };
+
+      const availabilityId = `${gameId}_${tableType}_${num}`;
+      const availRef = adminDb.collection("availability").doc(availabilityId);
+
+      const availabilityData = {
+        reservationId: resId,
+        gameId,
+        gameName,
+        clientName: clientName.trim(),
+        clientPhone: clientPhone.trim(),
+        tableType,
+        tableNumber: Number(num),
+        status: initialStatus,
+        updatedAt: timestamp
+      };
+
+      batch.set(adminDb.collection("reservations").doc(resId), reservationData);
+      batch.set(availRef, availabilityData);
+
+      itemsCreated.push(reservationData);
+    }
+
     await batch.commit();
 
     // Write Audit Log
@@ -266,7 +311,7 @@ app.post("/api/reservations/create", createRateLimiter(10, 5 * 60 * 1000), async
       await adminDb.collection("auditLogs").doc(auditLogId).set({
         id: auditLogId,
         action: "create_reservation",
-        details: `Nova reserva #${tableNumber} (${tableType}) criada com sucesso para ${clientName}.`,
+        details: `Nova reserva de ${tableNumbersSelected.length} mesas (${tableType}) criada com sucesso para ${clientName}. Mesas: #${tableNumbersSelected.join(", #")}`,
         performedBy: "Public Client API",
         performedByEmail: clientPhone,
         timestamp
@@ -278,7 +323,7 @@ app.post("/api/reservations/create", createRateLimiter(10, 5 * 60 * 1000), async
     return res.status(200).json({
       success: true,
       ok: true,
-      reservation: reservationData
+      reservation: itemsCreated[0]
     });
   } catch (err: any) {
     console.error("[SERVER RESERVATION EXCEPTION]:", err);
@@ -303,26 +348,42 @@ app.post("/api/reservations/confirm-payment", createRateLimiter(20, 5 * 60 * 100
     }
 
     const resData = resSnap.data()!;
-    const availabilityId = `${resData.gameId}_${resData.tableType}_${resData.tableNumber}`;
-    const availRef = adminDb.collection("availability").doc(availabilityId);
-
+    const groupId = resData.groupId;
     const timestamp = new Date().toISOString();
 
-    const batch = adminDb.batch();
-    
-    // Update reservation with confirmed status and payment details
-    batch.update(resRef, {
-      status: "confirmado",
-      paymentMethod: paymentMethod,
-      paymentId: paymentId || "",
-      updatedAt: timestamp
-    });
+    let reservationsToConfirm = [resSnap];
+    if (groupId) {
+      const groupSnap = await adminDb.collection("reservations")
+        .where("groupId", "==", groupId)
+        .get();
+      reservationsToConfirm = groupSnap.docs;
+    }
 
-    // Update availability to matching confirmed status
-    batch.set(availRef, {
-      status: "confirmado",
-      updatedAt: timestamp
-    }, { merge: true });
+    const batch = adminDb.batch();
+    const tableNumbersConfirmed: number[] = [];
+    
+    for (const docSnap of reservationsToConfirm) {
+      const rId = docSnap.id;
+      const data = docSnap.data();
+      const currentRef = adminDb.collection("reservations").doc(rId);
+
+      batch.update(currentRef, {
+        status: "confirmado",
+        paymentMethod: paymentMethod,
+        paymentId: paymentId || "",
+        updatedAt: timestamp
+      });
+
+      const availabilityId = `${data.gameId}_${data.tableType}_${data.tableNumber}`;
+      const availRef = adminDb.collection("availability").doc(availabilityId);
+      
+      batch.set(availRef, {
+        status: "confirmado",
+        updatedAt: timestamp
+      }, { merge: true });
+
+      tableNumbersConfirmed.push(data.tableNumber);
+    }
 
     await batch.commit();
 
@@ -332,7 +393,7 @@ app.post("/api/reservations/confirm-payment", createRateLimiter(20, 5 * 60 * 100
       await adminDb.collection("auditLogs").doc(auditLogId).set({
         id: auditLogId,
         action: "confirm_payment",
-        details: `Pagamento confirmado via ${paymentMethod.toUpperCase()} p/ mesa #${resData.tableNumber} do jogo ${resData.gameName}.`,
+        details: `Pagamento de ${tableNumbersConfirmed.length} mesa(s) (#${tableNumbersConfirmed.join(", #")}) confirmado via ${paymentMethod.toUpperCase()} para o jogo ${resData.gameName}.`,
         performedBy: "Public Payment API",
         performedByEmail: resData.clientPhone || "Public Client",
         timestamp
@@ -776,27 +837,48 @@ app.post("/api/reservations/update-status", adminGuard, async (req, res) => {
     }
 
     const resData = resSnap.data()!;
-    const availabilityId = `${resData.gameId}_${resData.tableType}_${resData.tableNumber}`;
-    const availRef = adminDb.collection("availability").doc(availabilityId);
+    const groupId = resData.groupId;
+    const timestamp = new Date().toISOString();
+
+    let reservationsToUpdate = [resSnap];
+    if (groupId) {
+      const groupSnap = await adminDb.collection("reservations")
+        .where("groupId", "==", groupId)
+        .get();
+      reservationsToUpdate = groupSnap.docs;
+    }
 
     // Perform transactionally to maintain complete reference safety
     const batch = adminDb.batch();
-    batch.update(resRef, {
-      status: nextStatus,
-      updatedAt: new Date().toISOString()
-    });
+    const tableNumbersUpdated: number[] = [];
 
-    if (nextStatus === "cancelado" || nextStatus === "liberada automaticamente") {
-      batch.delete(availRef);
-    } else {
-      batch.set(availRef, {
-        reservationId,
-        gameId: resData.gameId,
-        tableType: resData.tableType,
-        tableNumber: Number(resData.tableNumber),
+    for (const docSnap of reservationsToUpdate) {
+      const rId = docSnap.id;
+      const data = docSnap.data();
+      const currentRef = adminDb.collection("reservations").doc(rId);
+
+      batch.update(currentRef, {
         status: nextStatus,
-        updatedAt: new Date().toISOString()
-      }, { merge: true });
+        updatedAt: timestamp
+      });
+
+      const availabilityId = `${data.gameId}_${data.tableType}_${data.tableNumber}`;
+      const availRef = adminDb.collection("availability").doc(availabilityId);
+
+      if (nextStatus === "cancelado" || nextStatus === "liberada automaticamente") {
+        batch.delete(availRef);
+      } else {
+        batch.set(availRef, {
+          reservationId: rId,
+          gameId: data.gameId,
+          tableType: data.tableType,
+          tableNumber: Number(data.tableNumber),
+          status: nextStatus,
+          updatedAt: timestamp
+        }, { merge: true });
+      }
+
+      tableNumbersUpdated.push(data.tableNumber);
     }
 
     await batch.commit();
@@ -806,7 +888,7 @@ app.post("/api/reservations/update-status", adminGuard, async (req, res) => {
     await adminDb.collection("auditLogs").doc(logId).set({
       id: logId,
       action: "update_status",
-      details: `Status da reserva de ${resData.clientName} (Mesa #${resData.tableNumber}) alterado para '${nextStatus}' por ${performerEmail}.`,
+      details: `Status de ${tableNumbersUpdated.length} mesa(s) de ${resData.clientName} (#${tableNumbersUpdated.join(", #")}) alterado para '${nextStatus}' por ${performerEmail}.`,
       performedBy: performerUid,
       performedByEmail: performerEmail,
       timestamp: new Date().toISOString()

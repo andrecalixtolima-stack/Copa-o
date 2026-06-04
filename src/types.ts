@@ -38,6 +38,8 @@ export interface Reservation {
   paxCount: number;
   tableType: "mesa4" | "mesa2";
   tableNumber: number; // 1-indexed up to respective tablesTotal
+  tableNumbers?: number[]; // list of tables associated with group bookings
+  groupId?: string;        // matches similar reservations created together
   status: ReservationStatus;
   hasExtraSeat?: boolean;
   paymentProofUrl?: string; // or text proof info
