@@ -279,7 +279,9 @@ app.post("/api/reservations/create", createRateLimiter(10, 5 * 60 * 1000), async
         createdAt: timestamp,
         updatedAt: timestamp,
         groupId: groupResId,
-        tableNumbers: tableNumbersSelected
+        tableNumbers: tableNumbersSelected,
+        isSharedGroup: i === 0 ? !!req.body.isSharedGroup : false,
+        sharedGroupHost: (i === 0 && req.body.isSharedGroup) ? (req.body.sharedGroupHost || clientName.trim()) : ""
       };
 
       const availabilityId = `${gameId}_${tableType}_${num}`;
@@ -328,6 +330,122 @@ app.post("/api/reservations/create", createRateLimiter(10, 5 * 60 * 1000), async
   } catch (err: any) {
     console.error("[SERVER RESERVATION EXCEPTION]:", err);
     return res.status(500).json({ error: err.message || "Erro interno do servidor ao processar reserva." });
+  }
+});
+
+// API Route: Public - Get Shared Group Info
+app.get("/api/shared-group/info", async (req, res) => {
+  try {
+    const id = req.query.id as string;
+    if (!id) {
+      return res.status(400).json({ error: "Faltando o ID do grupo." });
+    }
+
+    const parentSnap = await adminDb.collection("reservations").doc(id).get();
+    if (!parentSnap.exists) {
+      return res.status(404).json({ error: "Reserva de aniversário / compartilhada não encontrada." });
+    }
+
+    const parent = parentSnap.data();
+    if (parent?.status === "cancelado" || parent?.status === "liberada automaticamente") {
+      return res.status(400).json({ error: "Esta reserva de aniversário foi cancelada ou liberada no sistema." });
+    }
+
+    const gameSnap = await adminDb.collection("games").doc(parent.gameId).get();
+    const game = gameSnap.exists ? gameSnap.data() : null;
+
+    const contribsSnap = await adminDb.collection("reservations")
+      .where("groupId", "==", id)
+      .get();
+
+    const contributions: any[] = [];
+    contribsSnap.forEach(docSnap => {
+      const d = docSnap.data();
+      if (d.status !== "cancelado" && d.status !== "liberada automaticamente") {
+        contributions.push(d);
+      }
+    });
+
+    return res.status(200).json({
+      success: true,
+      parent,
+      game,
+      contributions
+    });
+  } catch (err: any) {
+    console.error("[SERVER SHARED GROUP INFO EXCEPTION]:", err);
+    return res.status(500).json({ error: err.message || "Erro ao carregar link de aniversário." });
+  }
+});
+
+// API Route: Public - Contribute Pax to Shared Group
+app.post("/api/reservations/contribute", createRateLimiter(20, 5 * 60 * 1000), async (req, res) => {
+  try {
+    const { groupId, clientName, clientPhone, paxCount } = req.body;
+
+    if (!groupId || !clientName || !clientPhone || !paxCount || Number(paxCount) <= 0) {
+      return res.status(400).json({ error: "Dados de contribuição inválidos." });
+    }
+
+    const parentSnap = await adminDb.collection("reservations").doc(groupId).get();
+    if (!parentSnap.exists) {
+      return res.status(404).json({ error: "Grupo de aniversário não encontrado." });
+    }
+
+    const parent = parentSnap.data()!;
+    if (parent.status === "cancelado" || parent.status === "liberada automaticamente") {
+      return res.status(400).json({ error: "Este grupo foi cancelado pelo sistema." });
+    }
+
+    const id = adminDb.collection("reservations").doc().id;
+    const timestamp = new Date().toISOString();
+
+    const contributionData = {
+      id,
+      gameId: parent.gameId,
+      gameName: parent.gameName,
+      gameDateTime: parent.gameDateTime,
+      isBrazilGame: !!parent.isBrazilGame,
+      clientName: `${clientName.trim()} (Convidado de ${parent.clientName})`,
+      clientPhone: clientPhone.trim(),
+      paxCount: Number(paxCount),
+      tableType: parent.tableType,
+      tableNumber: parent.tableNumber,
+      tableNumbers: parent.tableNumbers || [parent.tableNumber],
+      status: "aguardando comprovante", 
+      paymentMethod: "pix_coletivo",
+      paymentId: "",
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      groupId: groupId,
+      isContribution: true,
+      sharedGroupHost: parent.clientName
+    };
+
+    await adminDb.collection("reservations").doc(id).set(contributionData);
+
+    try {
+      const auditLogId = adminDb.collection("auditLogs").doc().id;
+      await adminDb.collection("auditLogs").doc(auditLogId).set({
+        id: auditLogId,
+        action: "create_contribution",
+        details: `Nova contribuição de ${paxCount} pessoas criada por ${clientName} para o grupo de aniversário de ${parent.clientName}.`,
+        performedBy: "Public Client API",
+        performedByEmail: clientPhone,
+        timestamp
+      });
+    } catch (auditErr) {
+      console.error("[AUDIT LOG ERROR] Non-blocking writer:", auditErr);
+    }
+
+    return res.status(200).json({
+      success: true,
+      ok: true,
+      reservation: contributionData
+    });
+  } catch (err: any) {
+    console.error("[SERVER CONTRIBUTE EXCEPTION]:", err);
+    return res.status(500).json({ error: err.message || "Erro ao processar sua contribuição no servidor." });
   }
 });
 

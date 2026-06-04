@@ -16,6 +16,7 @@ export interface Game {
   tablesTotal2: number; // default 3
   priceTable4: number;  // default 24
   priceTable2: number;  // default 12
+  disableExtraSeats?: boolean; // toggle to block individual extra seats for a game/day
   createdAt: string;
   updatedAt: string;
 }
@@ -45,6 +46,9 @@ export interface Reservation {
   paymentProofUrl?: string; // or text proof info
   paymentMethod?: "pix" | "pagseguro" | "gratis";
   paymentId?: string;
+  isSharedGroup?: boolean;
+  sharedGroupHost?: string;
+  isContribution?: boolean;
   createdAt: string;
   updatedAt: string;
 }

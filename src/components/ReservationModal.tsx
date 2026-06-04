@@ -49,6 +49,8 @@ export default function ReservationModal({
     }
   };
   const [extraSeat, setExtraSeat] = useState(false);
+  const [isSharedGroup, setIsSharedGroup] = useState(false);
+  const [sharedGroupHost, setSharedGroupHost] = useState("");
 
   const [loading, setLoading] = useState(false);
   const [formError, setFormError] = useState("");
@@ -84,6 +86,12 @@ export default function ReservationModal({
       setSelectedTableNumbers([]);
     }
   }, [paxCount, tableType, selectedTableNumbers]);
+
+  useEffect(() => {
+    if (game.disableExtraSeats) {
+      setExtraSeat(false);
+    }
+  }, [game.disableExtraSeats]);
 
   // Visual helper lists of table numbers
   const mesa4Numbers = Array.from({ length: game.tablesTotal4 }, (_, i) => i + 1); // 1 to 30
@@ -355,7 +363,9 @@ export default function ReservationModal({
           tableType: tableType,
           tableNumber: selectedTableNumbers[0], // First table number for backwards compatibility
           tableNumbers: selectedTableNumbers,   // Complete array of chosen tables
-          hasExtraSeat: extraSeat
+          hasExtraSeat: extraSeat,
+          isSharedGroup: isSharedGroup,
+          sharedGroupHost: isSharedGroup ? (sharedGroupHost.trim() || clientName.trim()) : ""
         })
       });
 
@@ -435,9 +445,11 @@ export default function ReservationModal({
     
     // Explicitly determine value to make the PIX and Reservation audit airtight
     const resPrice = res ? getCreatedReservationPrice() : calculatePrice();
+    const isBirthday = (res && (res as any).isSharedGroup) || isSharedGroup;
+    const birthdayLabel = isBirthday && res ? `\nLink dos Convidados: ${window.location.origin}/?aniversario=${res.id}\n` : "";
     const extraLabel = hasExtra ? " (com 1 cadeira/ingresso extra individual)" : "";
     
-    const textMsg = `Olá! Acabei de fazer minha reserva para o COPAÇO no Quinteiro e estou enviando meu comprovante de pagamento.\n\n*Resumo da Reserva*:\nCliente: ${client}\nJogo: ${matchName}\n${tablesLabel} (${tType === "mesa4" ? "Mesa para 4 pessoas" : "Mesa para 2 pessoas"})${extraLabel}\nQuantidade de pessoas: ${pCount} pessoas\nValor total via PIX: R$ ${resPrice},00\n\nAguardando confirmação!`;
+    const textMsg = `Olá! Acabei de fazer minha reserva para o COPAÇO no Quinteiro e estou enviando meu comprovante de pagamento.\n\n*Resumo da Reserva*:\nCliente: ${client}\nJogo: ${matchName}\n${tablesLabel} (${tType === "mesa4" ? "Mesa para 4 pessoas" : "Mesa para 2 pessoas"})${extraLabel}\nQuantidade de pessoas: ${pCount} pessoas\nValor total via PIX: R$ ${resPrice},00${birthdayLabel}\n\nAguardando confirmação!`;
     return `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(textMsg)}`;
   };
 
@@ -695,7 +707,7 @@ export default function ReservationModal({
                     </div>
 
                     {/* Odd-number extra seat option for Brazil games */}
-                    {game.isBrazilGame && (
+                    {game.isBrazilGame && !game.disableExtraSeats && (
                       <div className="bg-[#042010] border border-soccer-field/40 p-3 rounded-xl mt-3 space-y-1.5 transition-all">
                         <label className="flex items-start gap-2.5 cursor-pointer group select-none">
                           <input
@@ -716,6 +728,46 @@ export default function ReservationModal({
                         </label>
                       </div>
                     )}
+
+                    {/* Mesa de Aniversário ou Dividida por Link (Vaquinha) Toggle */}
+                    <div className="bg-[#042010] border border-soccer-field/40 p-4 rounded-xl mt-3 space-y-3 transition-all">
+                      <label className="flex items-start gap-2.5 cursor-pointer group select-none">
+                        <input
+                          id="shared_group_checkbox"
+                          type="checkbox"
+                          checked={isSharedGroup}
+                          onChange={(e) => setIsSharedGroup(e.target.checked)}
+                          className="mt-0.5 rounded border-soccer-field/60 text-soccer-gold focus:ring-0 cursor-pointer h-4 w-4 bg-[#03140a]"
+                        />
+                        <div className="text-xs">
+                          <span className="font-bold text-white group-hover:text-soccer-gold transition-colors block">
+                            🎂 Abrir como Mesa de Aniversário ou Dividida?
+                          </span>
+                          <span className="text-[10px] text-soccer-cream/70 leading-normal block mt-0.5">
+                            Seus convidados poderão confirmar e pagar a cadeira deles individualmente via Pix usando um link exclusivo!
+                          </span>
+                        </div>
+                      </label>
+
+                      {isSharedGroup && (
+                        <div className="space-y-1.5 pt-2 animate-fade-in text-left">
+                          <label className="block text-[10px] font-mono text-soccer-gold uppercase font-bold">
+                            Nome do Aniversariante / Nome do Grupo
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="Ex: Aniversário da Ana"
+                            value={sharedGroupHost}
+                            onChange={(e) => setSharedGroupHost(e.target.value)}
+                            className="w-full bg-[#03140a] border border-soccer-field/60 focus:border-soccer-gold text-soccer-cream rounded-lg py-1.5 px-3 text-xs outline-none transition-all"
+                          />
+                          <p className="text-[9px] text-soccer-cream/60 italic leading-normal">
+                            O link gerado no final associará as pessoas a esta mesa de aniversário pelo nome. cada cadeira avulsa custará R$ 6,00.
+                          </p>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* Summary Area */}
@@ -1186,6 +1238,32 @@ export default function ReservationModal({
                       <span className="text-soccer-cream/80 font-mono text-[10px]">{createdReservation.paymentId}</span>
                     </div>
                   )}
+                </div>
+              )}
+
+              {createdReservation && createdReservation.isSharedGroup && (
+                <div className="bg-[#042010] border border-soccer-gold/40 p-5 rounded-2xl text-left space-y-3 font-sans text-xs text-soccer-cream shadow-md">
+                  <div className="flex items-center gap-2 text-soccer-gold font-bold">
+                    <span>👑 Link de Convites de Aniversário</span>
+                  </div>
+                  <p className="text-zinc-300 text-xs leading-normal">
+                    Como você criou uma <strong>Mesa de Aniversário / Compartilhada</strong>, copie o link exclusivo abaixo e envie para os seus convidados no WhatsApp. Eles poderão confirmar presença e pagar a cadeira individual de R$ 6,00 diretamente!
+                  </p>
+                  
+                  <div className="bg-black/40 border border-soccer-field/50 p-3 rounded-xl flex items-center justify-between gap-3 font-mono text-xs">
+                    <span className="text-soccer-cream truncate select-all">{`${window.location.origin}/?aniversario=${createdReservation.id}`}</span>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(`${window.location.origin}/?aniversario=${createdReservation.id}`);
+                        setCopied(true);
+                        setTimeout(() => setCopied(false), 2000);
+                      }}
+                      className="px-3 py-1.5 bg-soccer-field text-soccer-gold hover:bg-soccer-field/80 rounded transition-all flex items-center gap-1 cursor-pointer shrink-0"
+                    >
+                      {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Clipboard className="w-3.5 h-3.5" />}
+                      <span>{copied ? "Copiado!" : "Copiar"}</span>
+                    </button>
+                  </div>
                 </div>
               )}
 

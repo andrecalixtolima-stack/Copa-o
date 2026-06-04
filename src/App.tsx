@@ -10,6 +10,7 @@ import { Game, Reservation, BlockedTable, HomepageSettings, getDirectImageUrl } 
 import Header from "./components/Header";
 import MatchList from "./components/MatchList";
 import ReservationModal from "./components/ReservationModal";
+import SharedGroupModal from "./components/SharedGroupModal";
 import AdminPanel from "./components/AdminPanel";
 import LogoImage from "./components/LogoImage";
 import { 
@@ -44,6 +45,7 @@ export default function App() {
   const [isAdminMode, setIsAdminMode] = useState(false);
   const [isFirebaseAdmin, setIsFirebaseAdmin] = useState(false);
   const [selectedGame, setSelectedGame] = useState<Game | null>(null);
+  const [activeSharedGroupId, setActiveSharedGroupId] = useState<string | null>(null);
   const [gameToEdit, setGameToEdit] = useState<Game | null>(null);
   
   const [showMethaBanner, setShowMethaBanner] = useState(true);
@@ -131,6 +133,15 @@ export default function App() {
       unsubBlocks();
       unsubTexts();
     };
+  }, []);
+
+  // Check for shared group / birthday link in URL on application load
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const gr = params.get("aniversario") || params.get("grupo") || params.get("group");
+    if (gr) {
+      setActiveSharedGroupId(gr);
+    }
   }, []);
 
   // Secure PII Isolation: Dynamic loader for reservation feed based on role / Admin mode Active
@@ -551,6 +562,19 @@ export default function App() {
           blockedTables={blockedTables} 
           onClose={() => setSelectedGame(null)} 
           onSuccess={() => {}} 
+        />
+      )}
+
+      {/* SHARED GROUP / ANNIVERSARY CONVITE MODAL */}
+      {activeSharedGroupId && (
+        <SharedGroupModal 
+          groupId={activeSharedGroupId}
+          onClose={() => {
+            setActiveSharedGroupId(null);
+            // also clean the URL query parameter elegantly without reloading the page
+            const newUrl = window.location.pathname;
+            window.history.replaceState({}, document.title, newUrl);
+          }}
         />
       )}
 

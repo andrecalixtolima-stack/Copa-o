@@ -359,6 +359,7 @@ export default function AdminPanel({
   const [formTables2, setFormTables2] = useState(3);
   const [formPrice4, setFormPrice4] = useState(24);
   const [formPrice2, setFormPrice2] = useState(12);
+  const [formDisableExtraSeats, setFormDisableExtraSeats] = useState(false);
 
   // Blocking / Manual Booking states
   const [selectedGameId, setSelectedGameId] = useState("");
@@ -790,6 +791,7 @@ Esperamos vocês!`;
     setFormTables2(2);
     setFormPrice4(24);
     setFormPrice2(12);
+    setFormDisableExtraSeats(false);
     setShowGameForm(true);
   };
 
@@ -816,6 +818,7 @@ Esperamos vocês!`;
     setFormTables2(game.tablesTotal2);
     setFormPrice4(game.priceTable4);
     setFormPrice2(game.priceTable2);
+    setFormDisableExtraSeats(!!game.disableExtraSeats);
     setShowGameForm(true);
   };
 
@@ -841,6 +844,7 @@ Esperamos vocês!`;
         tablesTotal2: Number(formTables2),
         priceTable4: Number(formPrice4),
         priceTable2: Number(formPrice2),
+        disableExtraSeats: !!formDisableExtraSeats,
       };
 
       if (editingGame) {
@@ -1897,6 +1901,24 @@ Esperamos vocês!`;
                     </div>
                   </div>
 
+                  {formIsBrazil && (
+                    <div className="flex items-center gap-3 bg-red-950/20 p-3 rounded-lg border border-red-900/30">
+                      <input
+                        id="game_disable_extras_toggle"
+                        type="checkbox"
+                        checked={formDisableExtraSeats}
+                        onChange={(e) => setFormDisableExtraSeats(e.target.checked)}
+                        className="w-4 h-4 text-soccer-gold border-soccer-gold rounded focus:ring-soccer-gold"
+                      />
+                      <div>
+                        <label htmlFor="game_disable_extras_toggle" className="block text-xs font-bold text-soccer-cream cursor-pointer">
+                          Bloquear Cadeiras / Ingressos Extras para esta Data?
+                        </label>
+                        <span className="text-[10px] text-soccer-cream/50">Se ativado, não permitirá que os clientes adicionem cadeira extra (Ímpar) nesta data / jogo.</span>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
                     <div>
                       <label className="block text-[10px] uppercase font-mono text-soccer-cream/50 mb-0.5">Total Mesas (4p)</label>
@@ -2324,11 +2346,21 @@ Esperamos vocês!`;
                     return (
                       <tr key={res.id} className="hover:bg-soccer-field/15">
                         <td className="px-4 py-4">
-                          <div className="font-semibold text-sm flex items-center gap-1.5">
+                          <div className="font-semibold text-sm flex flex-wrap items-center gap-1.5">
                             <span>{res.clientName}</span>
                             {isMulti && (
                               <span className="px-1.5 py-0.5 bg-soccer-orange/10 border border-soccer-orange/20 text-soccer-orange rounded text-[9px] font-mono font-bold">
                                 MULTI
+                              </span>
+                            )}
+                            {res.isSharedGroup && (
+                              <span className="px-1.5 py-0.5 bg-pink-500/15 border border-pink-500/30 text-pink-400 rounded text-[9px] font-mono font-bold">
+                                🎂 ANIVERSÁRIO
+                              </span>
+                            )}
+                            {res.isContribution && (
+                              <span className="px-1.5 py-0.5 bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 rounded text-[9px] font-mono font-bold">
+                                👥 CONVIDADO DE {res.sharedGroupHost?.toUpperCase()}
                               </span>
                             )}
                           </div>
