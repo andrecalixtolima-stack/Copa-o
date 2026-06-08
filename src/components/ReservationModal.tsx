@@ -124,7 +124,9 @@ export default function ReservationModal({
     const count = (createdReservation as any).tableNumbers && (createdReservation as any).tableNumbers.length > 0
       ? (createdReservation as any).tableNumbers.length
       : 1;
-    return createdReservation.hasExtraSeat ? (basePrice * count + 6) : (basePrice * count);
+    const hasExtra = !!createdReservation.hasExtraSeat || 
+      (createdReservation.paxCount > (createdReservation.tableType === "mesa4" ? 4 : 2) * count);
+    return hasExtra ? (basePrice * count + 6) : (basePrice * count);
   };
 
   const handleCardPaymentSubmit = async (e: React.FormEvent) => {
@@ -1179,7 +1181,13 @@ export default function ReservationModal({
                       ? `Mesas: #${(createdReservation as any).tableNumbers.join(", #")}`
                       : `Mesa #${createdReservation ? createdReservation.tableNumber : (selectedTableNumbers.length > 0 ? selectedTableNumbers.join(", #") : "1")}`
                     }<br />
-                    Para {createdReservation ? createdReservation.paxCount : (extraSeat ? paxCount + 1 : paxCount)} pessoas {(createdReservation?.hasExtraSeat || (!createdReservation && extraSeat)) ? "(Ímpar)" : ""}
+                    Para {createdReservation ? createdReservation.paxCount : (extraSeat ? paxCount + 1 : paxCount)} pessoas {(
+                      (createdReservation && (
+                        !!createdReservation.hasExtraSeat || 
+                        createdReservation.paxCount > (createdReservation.tableType === "mesa4" ? 4 : 2) * ((createdReservation as any).tableNumbers && (createdReservation as any).tableNumbers.length > 0 ? (createdReservation as any).tableNumbers.length : 1)
+                      )) || 
+                      (!createdReservation && extraSeat)
+                    ) ? "(Ímpar)" : ""}
                   </div>
                 </div>
               </div>
@@ -1282,7 +1290,7 @@ export default function ReservationModal({
                       }
                     </span>
                   </div>
-                  {createdReservation.hasExtraSeat && (
+                  {(createdReservation.hasExtraSeat || createdReservation.paxCount > (createdReservation.tableType === "mesa4" ? 4 : 2) * ((createdReservation as any).tableNumbers && (createdReservation as any).tableNumbers.length > 0 ? (createdReservation as any).tableNumbers.length : 1)) && (
                     <div className="flex justify-between text-yellow-400">
                       <span className="text-yellow-400/70">Ingresso Extra (Ímpar):</span>
                       <span className="font-bold">+1 cadeira / ingresso incluído</span>
