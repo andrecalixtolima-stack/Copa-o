@@ -342,6 +342,90 @@ app.post("/api/reservations/create", createRateLimiter(10, 5 * 60 * 1000), async
   }
 });
 
+// Temporary debug route to inspect Julia's reservations
+app.get("/api/debug-julia", async (req, res) => {
+  try {
+    const rSnap = await adminDb.collection("reservations").get();
+    const results: any[] = [];
+    rSnap.forEach(doc => {
+      const data = doc.data();
+      const name = data.clientName || "";
+      if (name.toLowerCase().includes("julia")) {
+        results.push({
+          id: doc.id,
+          clientName: data.clientName,
+          clientPhone: data.clientPhone,
+          status: data.status,
+          isSharedGroup: data.isSharedGroup,
+          groupId: data.groupId,
+          gameId: data.gameId,
+          tableNumber: data.tableNumber,
+          createdAt: data.createdAt,
+          isBrazilGame: data.isBrazilGame,
+          gameName: data.gameName,
+          gameDateTime: data.gameDateTime
+        });
+      }
+    });
+    return res.status(200).json({ length: results.length, data: results });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// Helper function to resolve active parent reservation with self-healing capabilities
+async function resolveActiveParentReservation(id: string): Promise<{ parent: any; isSelfHealed: boolean }> {
+  const parentSnap = await adminDb.collection("reservations").doc(id).get();
+  if (!parentSnap.exists) {
+    return { parent: null, isSelfHealed: false };
+  }
+
+  const parent = parentSnap.data();
+  if (!parent) {
+    return { parent: null, isSelfHealed: false };
+  }
+  parent.id = id;
+
+  if (parent.status === "cancelado" || parent.status === "liberada automaticamente") {
+    const { clientName, clientPhone, gameId } = parent;
+
+    // Self-heal: find another active reservation for the same customer name and game
+    if (clientName && gameId) {
+      console.log(`[SELF-HEALING] Shared group link with id ${id} is cancelled/released. Searching for active reservation for clientName "${clientName}"...`);
+      const activeSnap = await adminDb.collection("reservations")
+        .where("gameId", "==", gameId)
+        .where("clientName", "==", clientName)
+        .get();
+
+      for (const doc of activeSnap.docs) {
+        const data = doc.data();
+        if (data.status !== "cancelado" && data.status !== "liberada automaticamente") {
+          console.log(`[SELF-HEALING MATCH] Found active reservation for ${clientName}: docId ${doc.id}`);
+          return { parent: { ...data, id: doc.id }, isSelfHealed: true };
+        }
+      }
+
+      if (clientPhone) {
+        console.log(`[SELF-HEALING] Searching for active reservation for clientPhone "${clientPhone}"...`);
+        const activePhoneSnap = await adminDb.collection("reservations")
+          .where("gameId", "==", gameId)
+          .where("clientPhone", "==", clientPhone)
+          .get();
+
+        for (const doc of activePhoneSnap.docs) {
+          const data = doc.data();
+          if (data.status !== "cancelado" && data.status !== "liberada automaticamente") {
+            console.log(`[SELF-HEALING MATCH] Found active reservation for phone ${clientPhone}: docId ${doc.id}`);
+            return { parent: { ...data, id: doc.id }, isSelfHealed: true };
+          }
+        }
+      }
+    }
+  }
+
+  return { parent, isSelfHealed: false };
+}
+
 // API Route: Public - Get Shared Group Info
 app.get("/api/shared-group/info", async (req, res) => {
   try {
@@ -350,21 +434,21 @@ app.get("/api/shared-group/info", async (req, res) => {
       return res.status(400).json({ error: "Faltando o ID do grupo." });
     }
 
-    const parentSnap = await adminDb.collection("reservations").doc(id).get();
-    if (!parentSnap.exists) {
+    const { parent } = await resolveActiveParentReservation(id);
+    if (!parent) {
       return res.status(404).json({ error: "Reserva de aniversário / compartilhada não encontrada." });
     }
 
-    const parent = parentSnap.data();
-    if (parent?.status === "cancelado" || parent?.status === "liberada automaticamente") {
+    if (parent.status === "cancelado" || parent.status === "liberada automaticamente") {
       return res.status(400).json({ error: "Esta reserva de aniversário foi cancelada ou liberada no sistema." });
     }
 
     const gameSnap = await adminDb.collection("games").doc(parent.gameId).get();
     const game = gameSnap.exists ? gameSnap.data() : null;
 
+    // Fetch contributions pointing to this resolved group
     const contribsSnap = await adminDb.collection("reservations")
-      .where("groupId", "==", id)
+      .where("groupId", "==", parent.id)
       .get();
 
     const contributions: any[] = [];
@@ -396,12 +480,11 @@ app.post("/api/reservations/contribute", createRateLimiter(20, 5 * 60 * 1000), a
       return res.status(400).json({ error: "Dados de contribuição inválidos." });
     }
 
-    const parentSnap = await adminDb.collection("reservations").doc(groupId).get();
-    if (!parentSnap.exists) {
+    const { parent } = await resolveActiveParentReservation(groupId);
+    if (!parent) {
       return res.status(404).json({ error: "Grupo de aniversário não encontrado." });
     }
 
-    const parent = parentSnap.data()!;
     if (parent.status === "cancelado" || parent.status === "liberada automaticamente") {
       return res.status(400).json({ error: "Este grupo foi cancelado pelo sistema." });
     }

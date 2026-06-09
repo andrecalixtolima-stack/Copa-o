@@ -55,21 +55,39 @@ if (admin.apps.length === 0) {
       const hasFooter = privateKey.includes("-----END PRIVATE KEY-----");
       console.log(`[FIREBASE Admin Debug] Sanitized Key - Length: ${privateKey.length}, Has Header: ${hasHeader}, Has Footer: ${hasFooter}`);
 
-      admin.initializeApp({
-        credential: admin.credential.cert({
-          projectId: finalProjectId,
-          clientEmail: clientEmail,
-          privateKey: privateKey
-        }),
-        projectId: finalProjectId
-      });
-      console.log("[FIREBASE Admin] Initialized with Private Key credentials (process.env.FIREBASE_PRIVATE_KEY).");
+      try {
+        admin.initializeApp({
+          credential: admin.credential.cert({
+            projectId: finalProjectId,
+            clientEmail: clientEmail,
+            privateKey: privateKey
+          }),
+          projectId: finalProjectId
+        });
+        console.log("[FIREBASE Admin] Initialized with Private Key credentials (process.env.FIREBASE_PRIVATE_KEY).");
+      } catch (certError: any) {
+        console.warn("[FIREBASE Admin] Cert initialization failed, attempting fallback to default ADC...", certError.message);
+        try {
+          admin.initializeApp({
+            projectId: finalProjectId
+          });
+          console.log("[FIREBASE Admin] Initialized with ADC fallback.");
+        } catch (fallbackError: any) {
+          console.error("[FIREBASE Admin] All initialization attempts failed. Server will start, but database query features may be limited.", fallbackError.message);
+          // Stub minimal initialization to prevent crash
+          try {
+            admin.initializeApp();
+          } catch (e: any) {
+            console.warn("[FIREBASE Admin] Stub init failed:", e.message);
+          }
+        }
+      }
     } else {
       throw new Error("Missing required environment variables (GOOGLE_CLOUD_PROJECT, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY) to initialize Firebase Admin cert.");
     }
   } catch (error) {
     console.error("[FIREBASE Admin] Exception during initialization:", error);
-    throw error;
+    // Do not throw the error to prevent crashing the server startup, but log it clearly
   }
 }
 
