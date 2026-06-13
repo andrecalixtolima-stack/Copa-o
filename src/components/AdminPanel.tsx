@@ -626,6 +626,78 @@ Esperamos vocês!`;
     });
   };
 
+  const handleSendWhatsAppSummary = () => {
+    const list = getFilteredAndSortedReservations();
+    if (list.length === 0) {
+      showFeedback("", "Nenhuma reserva encontrada para os filtros atuais.");
+      return;
+    }
+
+    // Determine title / filter context
+    const tabLabel = reservationSubTab === "trash" ? "LIXEIRA / CANCELADAS" : "ATIVAS";
+    let title = `Resumo de Reservas (${tabLabel}) - Copaço`;
+    if (selectedGameId) {
+      const g = games.find(game => game.id === selectedGameId);
+      if (g) {
+        const gameDateFormatted = new Date(g.dateTime).toLocaleDateString("pt-BR");
+        const gameTimeFormatted = new Date(g.dateTime).toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit' });
+        title = `Resumo de Reservas (${tabLabel})\n⚽ *${g.homeTeam} x ${g.awayTeam}*\n📅 *${gameDateFormatted} às ${gameTimeFormatted}*`;
+      }
+    } else {
+      title = `Resumo Geral de Reservas (${tabLabel})\n📅 *Gerado em ${new Date().toLocaleDateString("pt-BR")}*`;
+    }
+
+    // Compile statistics
+    const totalTables = list.length;
+    const totalPeople = list.reduce((sum, r) => sum + (r.paxCount || 0), 0);
+    const m4Count = list.filter(r => r.tableType === "mesa4").length;
+    const m2Count = list.filter(r => r.tableType === "mesa2").length;
+
+    let text = `🧾 *${title}*\n\n`;
+    text += `📊 *Estatísticas:* \n`;
+    text += `• Total de Mesas: *${totalTables}*\n`;
+    text += `• Total de Integrantes/Pessoas: *${totalPeople}*\n`;
+    text += `• Mesas de 4 Lugares (M4): *${m4Count}*\n`;
+    text += `• Mesas de 2 Lugares (M2): *${m2Count}*\n\n`;
+
+    text += `📋 *Relatório de Reservas:* \n`;
+
+    if (groupSameClient) {
+      const groupedList = groupReservationsList(list);
+      groupedList.forEach((g, idx) => {
+        const extraSeatLabel = g.hasExtraSeat ? " (+Cadeira Extra)" : "";
+        text += `\n${idx + 1}. *${g.clientName}*\n`;
+        text += `   • Mesas: ${g.tablesDesc}${extraSeatLabel}\n`;
+        text += `   • Pessoas: *${g.totalPax}* | Status: _${g.status.toUpperCase()}_\n`;
+        if (g.clientPhone) {
+          text += `   • Contato: ${g.clientPhone}\n`;
+        }
+      });
+    } else {
+      list.forEach((r, idx) => {
+        const tableLabel = `${r.tableType === "mesa4" ? "M4" : "M2"} #${r.tableNumber}`;
+        const extraSeatLabel = r.hasExtraSeat ? " (+Cadeira Extra)" : "";
+        text += `\n${idx + 1}. *${r.clientName}*\n`;
+        text += `   • Mesa: ${tableLabel}${extraSeatLabel}\n`;
+        text += `   • Pessoas: *${r.paxCount}* | Status: _${r.status.toUpperCase()}_\n`;
+        if (r.clientPhone) {
+          text += `   • Contato: ${r.clientPhone}\n`;
+        }
+        if (!selectedGameId) {
+          text += `   • Jogo: ${r.gameName}\n`;
+        }
+      });
+    }
+
+    text += `\n\n*Gerado via Painel Administrativo Copaço*`;
+
+    // Encode text for URL
+    const urlEncodedText = encodeURIComponent(text);
+    // Open in new tab or send via whatsapp API
+    const whatsappUrl = `https://api.whatsapp.com/send?text=${urlEncodedText}`;
+    window.open(whatsappUrl, "_blank");
+  };
+
   // Dynamic homepage text editor states
   const [textBadge, setTextBadge] = useState("");
   const [textHeroPart1, setTextHeroPart1] = useState("");
@@ -2106,17 +2178,31 @@ Esperamos vocês!`;
               </button>
             </div>
 
-            {/* Same Client Grouping Toggle (Somar Pessoas) */}
-            <label className="flex items-center gap-2.5 bg-[#051c0f] border border-soccer-field px-4 py-2 rounded-xl text-xs font-mono text-soccer-gold cursor-pointer hover:border-soccer-gold/60 transition-colors">
-              <input
-                id="group_same_client_checkbox"
-                type="checkbox"
-                checked={groupSameClient}
-                onChange={(e) => setGroupSameClient(e.target.checked)}
-                className="w-4 h-4 accent-soccer-field border-soccer-field rounded focus:ring-0 cursor-pointer"
-              />
-              <span>Somar / Agrupar Mesas do Mesmo Cliente 👥</span>
-            </label>
+            <div className="flex flex-wrap items-center gap-3">
+              {/* Same Client Grouping Toggle (Somar Pessoas) */}
+              <label className="flex items-center gap-2.5 bg-[#051c0f] border border-soccer-field px-4 py-2 rounded-xl text-xs font-mono text-soccer-gold cursor-pointer hover:border-soccer-gold/60 transition-colors">
+                <input
+                  id="group_same_client_checkbox"
+                  type="checkbox"
+                  checked={groupSameClient}
+                  onChange={(e) => setGroupSameClient(e.target.checked)}
+                  className="w-4 h-4 accent-soccer-field border-soccer-field rounded focus:ring-0 cursor-pointer"
+                />
+                <span>Somar / Agrupar Mesas do Mesmo Cliente 👥</span>
+              </label>
+
+              {/* Mandar Resumo WhatsApp Button */}
+              <button
+                id="send_whatsapp_summary_btn"
+                type="button"
+                onClick={handleSendWhatsAppSummary}
+                className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white border border-emerald-500 px-4 py-2 rounded-xl text-xs font-mono font-bold cursor-pointer transition-all hover:scale-[1.02]"
+                title="Mandar resumo das reservas filtradas por WhatsApp"
+              >
+                <MessageSquare className="w-3.5 h-3.5 text-emerald-100" />
+                <span>Mandar Resumo WhatsApp 💬</span>
+              </button>
+            </div>
           </div>
 
           {/* Reservation Filtering tools */}
