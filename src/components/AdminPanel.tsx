@@ -639,12 +639,12 @@ Esperamos vocês!`;
     if (selectedGameId) {
       const g = games.find(game => game.id === selectedGameId);
       if (g) {
-        const gameDateFormatted = new Date(g.dateTime).toLocaleDateString("pt-BR");
-        const gameTimeFormatted = new Date(g.dateTime).toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit' });
+        const gameDateFormatted = new Date(g.dateTime).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
+        const gameTimeFormatted = new Date(g.dateTime).toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit', timeZone: "America/Sao_Paulo" });
         title = `Resumo de Reservas (${tabLabel})\n⚽ *${g.homeTeam} x ${g.awayTeam}*\n📅 *${gameDateFormatted} às ${gameTimeFormatted}*`;
       }
     } else {
-      title = `Resumo Geral de Reservas (${tabLabel})\n📅 *Gerado em ${new Date().toLocaleDateString("pt-BR")}*`;
+      title = `Resumo Geral de Reservas (${tabLabel})\n📅 *Gerado em ${new Date().toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}*`;
     }
 
     // Compile statistics
@@ -2100,7 +2100,8 @@ Esperamos vocês!`;
                         day: "2-digit",
                         month: "2-digit",
                         hour: "2-digit",
-                        minute: "2-digit"
+                        minute: "2-digit",
+                        timeZone: "America/Sao_Paulo"
                       })}
                     </td>
                     <td className="px-6 py-4">

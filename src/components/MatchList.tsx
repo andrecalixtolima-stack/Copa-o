@@ -72,7 +72,8 @@ export default function MatchList({
     return date.toLocaleDateString("pt-BR", {
       day: "2-digit",
       month: "short",
-      weekday: "long"
+      weekday: "long",
+      timeZone: "America/Sao_Paulo"
     }).replace(".", "");
   };
 
@@ -80,7 +81,8 @@ export default function MatchList({
     const date = new Date(isoString);
     return date.toLocaleTimeString("pt-BR", {
       hour: "2-digit",
-      minute: "2-digit"
+      minute: "2-digit",
+      timeZone: "America/Sao_Paulo"
     }) + "h";
   };
 

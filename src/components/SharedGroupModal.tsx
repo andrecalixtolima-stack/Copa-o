@@ -104,7 +104,7 @@ export default function SharedGroupModal({ groupId, onClose }: SharedGroupModalP
         month: "2-digit",
         hour: "2-digit",
         minute: "2-digit",
-        timeZone: "UTC",
+        timeZone: "America/Sao_Paulo",
       });
     } catch {
       return dateStr;
