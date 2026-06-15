@@ -381,6 +381,7 @@ export default function AdminPanel({
   const [editResPhone, setEditResPhone] = useState("");
   const [editResPax, setEditResPax] = useState<number>(4);
   const [editResExtra, setEditResExtra] = useState(false);
+  const [groupDetailsMap, setGroupDetailsMap] = useState<Record<string, { paxCount: number, hasExtraSeat: boolean }>>({});
   const [isSavingResEdit, setIsSavingResEdit] = useState(false);
   const [resEditError, setResEditError] = useState("");
 
@@ -391,6 +392,7 @@ export default function AdminPanel({
     setEditResPhone(res.clientPhone || "");
     setEditResPax(res.paxCount || 4);
     setEditResExtra(!!res.hasExtraSeat);
+    setGroupDetailsMap({});
     setResEditError("");
   };
 
@@ -402,6 +404,16 @@ export default function AdminPanel({
     setEditResPhone(group.clientPhone || "");
     setEditResPax(group.reservations[0].paxCount || 4);
     setEditResExtra(!!group.reservations[0].hasExtraSeat);
+    
+    // Initialize details map for the whole group
+    const initialMap: Record<string, { paxCount: number, hasExtraSeat: boolean }> = {};
+    group.reservations.forEach((res: Reservation) => {
+      initialMap[res.id] = {
+        paxCount: res.paxCount || 4,
+        hasExtraSeat: !!res.hasExtraSeat
+      };
+    });
+    setGroupDetailsMap(initialMap);
     setResEditError("");
   };
 
@@ -422,8 +434,9 @@ export default function AdminPanel({
 
     try {
       if (editingGroupReservations && editingGroupReservations.length > 0) {
-        // Edit group of tables: apply updated name and phone for each table in the group
+        // Edit group of tables: apply updated name, phone, pax, and extra seat for each table
         for (const res of editingGroupReservations) {
+          const tableDetail = groupDetailsMap[res.id] || { paxCount: res.paxCount || 4, hasExtraSeat: !!res.hasExtraSeat };
           const response = await fetch("/api/reservations/update-details", {
             method: "POST",
             headers: {
@@ -435,8 +448,8 @@ export default function AdminPanel({
               reservationId: res.id,
               clientName: editResName.trim(),
               clientPhone: editResPhone.trim(),
-              paxCount: Number(res.paxCount),       // Keep individual table's pax
-              hasExtraSeat: !!res.hasExtraSeat      // Keep individual table's extra seat setting
+              paxCount: Number(tableDetail.paxCount),
+              hasExtraSeat: !!tableDetail.hasExtraSeat
             })
           });
 
@@ -4007,7 +4020,66 @@ Esperamos vocês!`;
                   />
                 </div>
 
-                {(!editingGroupReservations || editingGroupReservations.length <= 1) && (
+                {editingGroupReservations && editingGroupReservations.length > 1 ? (
+                  <div className="space-y-4 border-t border-soccer-field/30 pt-4">
+                    <h4 className="text-xs font-bold uppercase tracking-tight text-soccer-gold font-mono">Assentos por Mesa</h4>
+                    {editingGroupReservations.map((res) => {
+                      const detail = groupDetailsMap[res.id] || { paxCount: res.paxCount || 4, hasExtraSeat: !!res.hasExtraSeat };
+                      return (
+                        <div key={res.id} className="bg-[#03150b] p-3 rounded-xl border border-soccer-field/30 flex flex-col gap-3">
+                          <div className="text-[10px] font-mono text-soccer-cream/85 flex justify-between">
+                            <span>🪑 {res.tableType === "mesa4" ? "Mesa para 4" : "Mesa para 2"} #{res.tableNumber}</span>
+                            <span className="text-soccer-gold/70 uppercase">ID: {res.id.slice(0, 8)}</span>
+                          </div>
+                          
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-[9px] font-mono text-soccer-gold/85 uppercase mb-1">Cadeiras (Pax)</label>
+                              <select
+                                value={detail.paxCount}
+                                onChange={(e) => {
+                                  const updated = Number(e.target.value);
+                                  setGroupDetailsMap(prev => ({
+                                    ...prev,
+                                    [res.id]: { ...prev[res.id], paxCount: updated }
+                                  }));
+                                }}
+                                className="w-full bg-[#051c0f] border border-soccer-field/60 rounded-xl py-1.5 px-2.5 text-xs text-soccer-cream outline-none focus:border-soccer-gold cursor-pointer"
+                              >
+                                <option value="1">1 Cadeira</option>
+                                <option value="2">2 Cadeiras</option>
+                                <option value="3">3 Cadeiras</option>
+                                <option value="4">4 Cadeiras</option>
+                                <option value="5">5 Cadeiras</option>
+                                <option value="6">6 Cadeiras</option>
+                                <option value="7">7 Cadeiras</option>
+                                <option value="8">8 Cadeiras</option>
+                              </select>
+                            </div>
+
+                            <div className="flex items-end">
+                              <label className="flex items-center gap-2 bg-[#051c0f] border border-soccer-field/60 rounded-xl py-2 px-3 text-xs text-soccer-cream outline-none cursor-pointer w-full hover:border-soccer-gold transition-colors">
+                                <input
+                                  type="checkbox"
+                                  checked={detail.hasExtraSeat}
+                                  onChange={(e) => {
+                                    const checked = e.target.checked;
+                                    setGroupDetailsMap(prev => ({
+                                      ...prev,
+                                      [res.id]: { ...prev[res.id], hasExtraSeat: checked }
+                                    }));
+                                  }}
+                                  className="w-4 h-4 accent-soccer-field rounded cursor-pointer"
+                                />
+                                <span className="text-[10px] font-mono uppercase text-soccer-gold">Cadeira Extra (+1)</span>
+                              </label>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-[10px] font-mono text-soccer-gold uppercase mb-1">Número de Cadeiras (Pax)</label>
