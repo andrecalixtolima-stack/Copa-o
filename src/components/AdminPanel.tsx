@@ -376,6 +376,7 @@ export default function AdminPanel({
 
   // Reservation Edit states
   const [editingRes, setEditingRes] = useState<Reservation | null>(null);
+  const [editingGroupReservations, setEditingGroupReservations] = useState<Reservation[] | null>(null);
   const [editResName, setEditResName] = useState("");
   const [editResPhone, setEditResPhone] = useState("");
   const [editResPax, setEditResPax] = useState<number>(4);
@@ -384,11 +385,23 @@ export default function AdminPanel({
   const [resEditError, setResEditError] = useState("");
 
   const handleOpenEditRes = (res: Reservation) => {
+    setEditingGroupReservations(null);
     setEditingRes(res);
     setEditResName(res.clientName || "");
     setEditResPhone(res.clientPhone || "");
     setEditResPax(res.paxCount || 4);
     setEditResExtra(!!res.hasExtraSeat);
+    setResEditError("");
+  };
+
+  const handleOpenEditGroup = (group: any) => {
+    if (!group.reservations || group.reservations.length === 0) return;
+    setEditingGroupReservations(group.reservations);
+    setEditingRes(group.reservations[0]);
+    setEditResName(group.clientName || "");
+    setEditResPhone(group.clientPhone || "");
+    setEditResPax(group.reservations[0].paxCount || 4);
+    setEditResExtra(!!group.reservations[0].hasExtraSeat);
     setResEditError("");
   };
 
@@ -408,34 +421,68 @@ export default function AdminPanel({
     setResEditError("");
 
     try {
-      const response = await fetch("/api/reservations/update-details", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-admin-uid": auth.currentUser?.uid || "local_bypass_admin",
-          "x-admin-email": auth.currentUser?.email || "andrecalixtolima@gmail.com"
-        },
-        body: JSON.stringify({
-          reservationId: editingRes.id,
-          clientName: editResName,
-          clientPhone: editResPhone,
-          paxCount: Number(editResPax),
-          hasExtraSeat: editResExtra
-        })
-      });
+      if (editingGroupReservations && editingGroupReservations.length > 0) {
+        // Edit group of tables: apply updated name and phone for each table in the group
+        for (const res of editingGroupReservations) {
+          const response = await fetch("/api/reservations/update-details", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-admin-uid": auth.currentUser?.uid || "local_bypass_admin",
+              "x-admin-email": auth.currentUser?.email || "andrecalixtolima@gmail.com"
+            },
+            body: JSON.stringify({
+              reservationId: res.id,
+              clientName: editResName.trim(),
+              clientPhone: editResPhone.trim(),
+              paxCount: Number(res.paxCount),       // Keep individual table's pax
+              hasExtraSeat: !!res.hasExtraSeat      // Keep individual table's extra seat setting
+            })
+          });
 
-      if (!response.ok) {
-        const text = await response.text();
-        let errMsg = text;
-        try {
-          const json = JSON.parse(text);
-          errMsg = json.error || errMsg;
-        } catch {}
-        throw new Error(errMsg || "Erro ao salvar dados.");
+          if (!response.ok) {
+            const text = await response.text();
+            let errMsg = text;
+            try {
+              const json = JSON.parse(text);
+              errMsg = json.error || errMsg;
+            } catch {}
+            throw new Error(errMsg || `Erro ao salvar dados da mesa #${res.tableNumber}.`);
+          }
+        }
+        showFeedback("Dados do grupo de reservas editados com sucesso!");
+      } else {
+        // Individual edit
+        const response = await fetch("/api/reservations/update-details", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-admin-uid": auth.currentUser?.uid || "local_bypass_admin",
+            "x-admin-email": auth.currentUser?.email || "andrecalixtolima@gmail.com"
+          },
+          body: JSON.stringify({
+            reservationId: editingRes.id,
+            clientName: editResName.trim(),
+            clientPhone: editResPhone.trim(),
+            paxCount: Number(editResPax),
+            hasExtraSeat: editResExtra
+          })
+        });
+
+        if (!response.ok) {
+          const text = await response.text();
+          let errMsg = text;
+          try {
+            const json = JSON.parse(text);
+            errMsg = json.error || errMsg;
+          } catch {}
+          throw new Error(errMsg || "Erro ao salvar dados.");
+        }
+        showFeedback("Reserva editada com sucesso!");
       }
 
-      showFeedback("Reserva editada com sucesso!");
       setEditingRes(null);
+      setEditingGroupReservations(null);
       onRefresh();
     } catch (err: any) {
       console.error("Erro ao salvar dados da reserva:", err);
@@ -2313,23 +2360,142 @@ Esperamos vocês!`;
             </div>
           </div>
 
-          {/* LIST TABLE OF RESERVATIONS */}
-          <div className="overflow-x-auto bg-[#03150b] rounded-2xl border border-soccer-field shadow-lg">
+          {/* LIST OF RESERVATIONS (WIDESCREEN TABLES AND RESPONSIVE CARD VIEWS) */}
+          <div className="space-y-4">
             
             {groupSameClient ? (
-              /* GROUPED VIEW TABLE */
-              <table className="w-full text-left text-xs text-soccer-cream">
-                <thead className="bg-[#051c0f] uppercase text-[10px] font-mono text-soccer-gold border-b border-soccer-field/70">
-                  <tr>
-                    <th className="px-4 py-4">Convidado / Telefone</th>
-                    <th className="px-4 py-4">Jogo</th>
-                    <th className="px-4 py-4">Mesas Agrupadas</th>
-                    <th className="px-4 py-4">Total Pax (Soma)</th>
-                    <th className="px-4 py-4">Último Status</th>
-                    <th className="px-4 py-4 text-right">Ação Rápida</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-soccer-field/20">
+              /* --- GROUPED VIEW SECTION --- */
+              <>
+                {/* Desktop View Table */}
+                <div className="hidden lg:block overflow-x-auto bg-[#03150b] rounded-2xl border border-soccer-field shadow-lg">
+                  <table className="w-full text-left text-xs text-soccer-cream">
+                    <thead className="bg-[#051c0f] uppercase text-[10px] font-mono text-soccer-gold border-b border-soccer-field/70">
+                      <tr>
+                        <th className="px-4 py-4">Convidado / Telefone</th>
+                        <th className="px-4 py-4">Jogo</th>
+                        <th className="px-4 py-4">Mesas Agrupadas</th>
+                        <th className="px-4 py-4">Total Pax (Soma)</th>
+                        <th className="px-4 py-4">Último Status</th>
+                        <th className="px-4 py-4 text-right">Ação Rápida</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-soccer-field/20">
+                      {groupReservationsList(getFilteredAndSortedReservations()).map((group) => {
+                        let statusColor = "bg-soccer-cream/10 text-soccer-cream/80 border-transparent";
+                        if (group.status === "confirmado" || group.status === "ativa") {
+                          statusColor = "bg-emerald-500/10 border-emerald-500/30 text-emerald-400";
+                        } else if (group.status === "aguardando comprovante") {
+                          statusColor = "bg-amber-500/10 border-amber-500/30 text-amber-400 animate-pulse";
+                        } else if (group.status === "cancelado" || group.status === "liberada automaticamente") {
+                          statusColor = "bg-red-500/10 border-red-500/30 text-red-400";
+                        }
+
+                        return (
+                          <tr key={`group_${group.id}`} className="hover:bg-soccer-field/15">
+                            <td className="px-4 py-4">
+                              <div className="font-semibold text-sm flex items-center gap-1.5 text-soccer-cream">
+                                {group.clientName}
+                                <span className="px-1.5 py-0.5 bg-soccer-gold/10 text-soccer-gold rounded font-bold text-[9px] uppercase">
+                                  {group.reservations.length}x Mesas
+                                </span>
+                              </div>
+                              <div className="text-[10px] font-mono text-soccer-cream/60 flex items-center gap-1 mt-1">
+                                <PhoneCall className="w-3 h-3 text-soccer-orange shrink-0" />
+                                <span className="select-all">{group.clientPhone}</span>
+                              </div>
+                              
+                              {/* Direct Whatsapp and Edit buttons */}
+                              <div className="flex flex-wrap gap-1.5 mt-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handleSendWhatsAppGroup(group)}
+                                  className="inline-flex items-center gap-1 bg-emerald-600 hover:bg-emerald-500 hover:scale-[1.02] text-white font-mono font-black text-[9px] uppercase tracking-wider px-2 py-1 rounded transition-all cursor-pointer shadow-sm active:translate-y-px"
+                                >
+                                  <MessageSquare className="w-3 h-3 shrink-0" />
+                                  <span>WhatsApp do Grupo 💚</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenEditGroup(group)}
+                                  className="inline-flex items-center gap-1 bg-soccer-gold hover:bg-yellow-400 hover:scale-[1.02] text-soccer-dark font-mono font-black text-[9px] uppercase tracking-wider px-2 py-1 rounded transition-all cursor-pointer shadow-sm active:translate-y-px"
+                                >
+                                  <Edit2 className="w-3 h-3 shrink-0" />
+                                  <span>Editar Dados ✏️</span>
+                                </button>
+                              </div>
+
+                              {/* Creation timestamp display listed inline */}
+                              <div className="text-[9px] font-mono text-soccer-gold/80 flex flex-col gap-0.5 mt-2">
+                                <span className="text-[8px] uppercase tracking-wider text-soccer-cream/50">📅 Datas de Criação:</span>
+                                {group.reservations.map((r) => (
+                                  <div key={r.id}>
+                                    • {r.tableType === "mesa4" ? "M4" : "M2"} #{r.tableNumber}: {r.createdAt ? new Date(r.createdAt).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" }) : "N/A"}
+                                  </div>
+                                ))}
+                              </div>
+                            </td>
+                            
+                            <td className="px-4 py-4 truncate max-w-[150px]">
+                              <div className="font-medium text-soccer-cream/95">{group.gameName}</div>
+                              <div className="text-[9px] font-mono text-soccer-cream/40">Múltiplos IDs</div>
+                            </td>
+                            
+                            <td className="px-4 py-4 font-mono text-xs font-black">
+                              <span className="text-soccer-gold bg-soccer-gold/5 px-2 py-1 border border-soccer-gold/10 rounded">
+                                {group.tablesDesc}
+                              </span>
+                            </td>
+                            
+                            <td className="px-4 py-4 font-mono">
+                              <div className="font-bold text-sm text-soccer-field-light">{group.totalPax} pessoas</div>
+                              <div className="text-[9px] text-soccer-cream/50">(Soma total de todas as comarcas)</div>
+                            </td>
+                            
+                            <td className="px-4 py-4">
+                              <span className={`px-2 py-0.5 rounded border text-[10px] uppercase font-bold inline-block ${statusColor}`}>
+                                {group.status}
+                              </span>
+                            </td>
+                            
+                            <td className="px-4 py-4 text-right">
+                              <div className="flex flex-col gap-1 items-end">
+                                <span className="text-[9px] text-soccer-cream/40 block">Alterar todas:</span>
+                                <select
+                                  id={`change_group_status_${group.id}`}
+                                  value={group.status}
+                                  onChange={async (e) => {
+                                    const nextSt = e.target.value as ReservationStatus;
+                                    // Perform update for ALL reservations of this group
+                                    for (const r of group.reservations) {
+                                      await handleUpdateStatus(r.id, nextSt);
+                                    }
+                                  }}
+                                  className="bg-[#051c0f] border border-soccer-field rounded-lg text-[10px] font-semibold text-soccer-cream py-1 px-1.5 outline-none cursor-pointer"
+                                >
+                                  <option value="aguardando comprovante">Aguardando Pgto</option>
+                                  <option value="confirmado">Confirmado ✔</option>
+                                  <option value="ativa">Ativa ⚽</option>
+                                  <option value="cancelado">Cancelado ✖</option>
+                                  <option value="liberada automaticamente">Liberada Auto 🕒</option>
+                                </select>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {groupReservationsList(getFilteredAndSortedReservations()).length === 0 && (
+                        <tr>
+                          <td colSpan={6} className="text-center py-10 text-soccer-cream/50 italic font-mono">
+                            Nenhuma reserva correspondente nesta seção.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Mobile View Card Layout */}
+                <div className="block lg:hidden space-y-4">
                   {groupReservationsList(getFilteredAndSortedReservations()).map((group) => {
                     let statusColor = "bg-soccer-cream/10 text-soccer-cream/80 border-transparent";
                     if (group.status === "confirmado" || group.status === "ativa") {
@@ -2341,66 +2507,85 @@ Esperamos vocês!`;
                     }
 
                     return (
-                      <tr key={`group_${group.id}`} className="hover:bg-soccer-field/15">
-                        <td className="px-4 py-4">
-                          <div className="font-semibold text-sm flex items-center gap-1.5 text-soccer-cream">
-                            {group.clientName}
-                            <span className="px-1.5 py-0.5 bg-soccer-gold/10 text-soccer-gold rounded font-bold text-[9px] uppercase">
-                              {group.reservations.length}x Mesas
+                      <div key={`group_mobile_${group.id}`} className="bg-[#03150b] border-2 border-soccer-field/40 p-4 rounded-2xl flex flex-col gap-3 shadow shadow-emerald-950/20 hover:border-soccer-gold/30 transition-all">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <div className="font-semibold text-sm text-soccer-cream flex items-center gap-1.5 flex-wrap">
+                              <span>{group.clientName}</span>
+                              <span className="px-1.5 py-0.5 bg-soccer-gold/10 text-soccer-gold rounded font-bold text-[9px] uppercase">
+                                {group.reservations.length}x Mesas
+                              </span>
+                            </div>
+                            <div className="text-[10px] font-mono text-soccer-cream/60 flex items-center gap-1 mt-1">
+                              <PhoneCall className="w-3 h-3 text-soccer-orange shrink-0" />
+                              <span className="select-all font-semibold font-mono">{group.clientPhone}</span>
+                            </div>
+                          </div>
+                          <div>
+                            <span className={`px-2 py-0.5 rounded border text-[9px] uppercase font-bold inline-block ${statusColor}`}>
+                              {group.status}
                             </span>
                           </div>
-                          <div className="text-[10px] font-mono text-soccer-cream/60 flex items-center gap-1 mt-1">
-                            <PhoneCall className="w-3 h-3 text-soccer-orange shrink-0" />
-                            <span>{group.clientPhone}</span>
+                        </div>
+
+                        <div className="bg-[#051c0f]/80 p-2.5 rounded-xl border border-soccer-field/30 flex flex-col gap-1.5 text-xs text-soccer-cream">
+                          <div className="flex justify-between items-center text-[10px] font-mono">
+                            <span className="text-soccer-cream/50">⚽ JOGO:</span>
+                            <span className="text-soccer-cream/90 font-bold truncate max-w-[180px]">{group.gameName}</span>
                           </div>
-                          
-                          {/* Direct Whatsapp send option */}
-                          <button
-                            type="button"
-                            onClick={() => handleSendWhatsAppGroup(group)}
-                            className="mt-2 inline-flex items-center gap-1 bg-emerald-600 hover:bg-emerald-500 hover:scale-[1.02] text-white font-mono font-black text-[9px] uppercase tracking-wider px-2 py-1 rounded-md transition-all cursor-pointer shadow-sm active:translate-y-px"
-                          >
-                            <MessageSquare className="w-3 h-3 shrink-0" />
-                            <span>WhatsApp do Grupo 💚</span>
-                          </button>
-                        </td>
-                        
-                        <td className="px-4 py-4 truncate max-w-[150px]">
-                          <div className="font-medium text-soccer-cream/95">{group.gameName}</div>
-                          <div className="text-[9px] font-mono text-soccer-cream/40">Múltiplos IDs</div>
-                        </td>
-                        
-                        <td className="px-4 py-4 font-mono text-xs font-black">
-                          <span className="text-soccer-gold bg-soccer-gold/5 px-2 py-1 border border-soccer-gold/10 rounded">
-                            {group.tablesDesc}
-                          </span>
-                        </td>
-                        
-                        <td className="px-4 py-4 font-mono">
-                          <div className="font-bold text-sm text-soccer-field-light">{group.totalPax} pessoas</div>
-                          <div className="text-[9px] text-soccer-cream/50">(Soma total de todas as comarcas)</div>
-                        </td>
-                        
-                        <td className="px-4 py-4">
-                          <span className={`px-2 py-0.5 rounded border text-[10px] uppercase font-bold inline-block ${statusColor}`}>
-                            {group.status}
-                          </span>
-                        </td>
-                        
-                        <td className="px-4 py-4 text-right">
-                          <div className="flex flex-col gap-1 items-end">
-                            <span className="text-[9px] text-soccer-cream/40 block">Alterar todas:</span>
+                          <div className="flex justify-between items-center text-[10px] font-mono">
+                            <span className="text-soccer-cream/50">🪑 MESAS:</span>
+                            <span className="text-soccer-gold font-bold">{group.tablesDesc}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-[10px] font-mono">
+                            <span className="text-soccer-cream/50">👥 TOTAL PAX:</span>
+                            <span className="text-soccer-field-light font-black">{group.totalPax} pessoas</span>
+                          </div>
+                          <div className="border-t border-soccer-field/20 pt-1.5 mt-1">
+                            <span className="text-[9px] font-semibold text-soccer-gold tracking-wide uppercase block mb-1">📅 Datas de Criação:</span>
+                            <div className="space-y-0.5 text-[9px] font-mono text-soccer-cream/70 max-h-[100px] overflow-y-auto">
+                              {group.reservations.map((r) => (
+                                <div key={r.id} className="flex justify-between gap-1">
+                                  <span>• {r.tableType === "mesa4" ? "M4" : "M2"} #{r.tableNumber}:</span>
+                                  <span>{r.createdAt ? new Date(r.createdAt).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" }) : "N/A"}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap gap-2 items-center justify-between border-t border-soccer-field/10 pt-2.5">
+                          <div className="flex gap-1.5 flex-wrap">
+                            <button
+                              type="button"
+                              onClick={() => handleSendWhatsAppGroup(group)}
+                              className="inline-flex items-center gap-1 bg-emerald-600 hover:bg-emerald-500 text-white font-mono font-black text-[9px] uppercase tracking-wider px-2 py-1.5 rounded transition-all cursor-pointer shadow-sm active:translate-y-px"
+                            >
+                              <MessageSquare className="w-3.5 h-3.5 shrink-0" />
+                              <span>WhatsApp 💚</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditGroup(group)}
+                              className="inline-flex items-center gap-1 bg-soccer-gold hover:bg-yellow-400 text-soccer-dark font-mono font-black text-[9px] uppercase tracking-wider px-2 py-1.5 rounded transition-all cursor-pointer shadow-sm active:translate-y-px"
+                            >
+                              <Edit2 className="w-3.5 h-3.5 shrink-0" />
+                              <span>Editar ✏️</span>
+                            </button>
+                          </div>
+
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[9px] font-mono text-soccer-cream/40">Status:</span>
                             <select
-                              id={`change_group_status_${group.id}`}
+                              id={`change_group_status_mobile_${group.id}`}
                               value={group.status}
                               onChange={async (e) => {
                                 const nextSt = e.target.value as ReservationStatus;
-                                // Perform update for ALL reservations of this group
                                 for (const r of group.reservations) {
                                   await handleUpdateStatus(r.id, nextSt);
                                 }
                               }}
-                              className="bg-[#051c0f] border border-soccer-field rounded-lg text-[10px] font-semibold text-soccer-cream py-1 px-1.5 outline-none cursor-pointer"
+                              className="bg-[#051c0f] border border-soccer-field rounded-lg text-[9px] font-bold text-soccer-cream py-1 px-1 outline-none cursor-pointer"
                             >
                               <option value="aguardando comprovante">Aguardando Pgto</option>
                               <option value="confirmado">Confirmado ✔</option>
@@ -2409,33 +2594,164 @@ Esperamos vocês!`;
                               <option value="liberada automaticamente">Liberada Auto 🕒</option>
                             </select>
                           </div>
-                        </td>
-                      </tr>
+                        </div>
+                      </div>
                     );
                   })}
                   {groupReservationsList(getFilteredAndSortedReservations()).length === 0 && (
-                    <tr>
-                      <td colSpan={6} className="text-center py-10 text-soccer-cream/50 italic font-mono">
-                        Nenhuma reserva correspondente nesta seção.
-                      </td>
-                    </tr>
+                    <div className="text-center py-10 text-soccer-cream/50 italic font-mono bg-[#03150b] rounded-2xl border border-soccer-field">
+                      Nenhuma reserva correspondente nesta seção.
+                    </div>
                   )}
-                </tbody>
-              </table>
+                </div>
+              </>
             ) : (
-              /* INDIVIDUAL VIEW TABLE (ALPHABETICAL & NUMERICAL SORTED) */
-              <table className="w-full text-left text-xs text-soccer-cream">
-                <thead className="bg-[#051c0f] uppercase text-[10px] font-mono text-soccer-gold border-b border-soccer-field/70">
-                  <tr>
-                    <th className="px-4 py-4">Convidado / Tel</th>
-                    <th className="px-4 py-4">Jogo</th>
-                    <th className="px-4 py-4">Mesa</th>
-                    <th className="px-4 py-4">Pax</th>
-                    <th className="px-4 py-4">Status</th>
-                    <th className="px-4 py-4 text-right">Ações</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-soccer-field/20">
+              /* --- INDIVIDUAL VIEW SECTION --- */
+              <>
+                {/* Desktop View Table */}
+                <div className="hidden lg:block overflow-x-auto bg-[#03150b] rounded-2xl border border-soccer-field shadow-lg">
+                  <table className="w-full text-left text-xs text-soccer-cream">
+                    <thead className="bg-[#051c0f] uppercase text-[10px] font-mono text-soccer-gold border-b border-soccer-field/70">
+                      <tr>
+                        <th className="px-4 py-4">Convidado / Tel</th>
+                        <th className="px-4 py-4">Jogo</th>
+                        <th className="px-4 py-4">Mesa</th>
+                        <th className="px-4 py-4">Pax</th>
+                        <th className="px-4 py-4">Status</th>
+                        <th className="px-4 py-4 text-right">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-soccer-field/20">
+                      {getFilteredAndSortedReservations().map((res) => {
+                        let statusColor = "bg-soccer-cream/10 text-soccer-cream/80 border-transparent";
+                        if (res.status === "confirmado" || res.status === "ativa") {
+                          statusColor = "bg-emerald-500/10 border-emerald-500/30 text-emerald-400";
+                        } else if (res.status === "aguardando comprovante") {
+                          statusColor = "bg-amber-500/10 border-amber-500/30 text-amber-400 animate-pulse";
+                        } else if (res.status === "cancelado" || res.status === "liberada automaticamente") {
+                          statusColor = "bg-red-500/10 border-red-500/30 text-red-400";
+                        }
+
+                        // Read other tables/pax of this duplicate client if any
+                        const agg = getClientAggregation(res.clientPhone);
+                        const isMulti = agg.totalTables > 1;
+
+                        return (
+                          <tr key={res.id} className="hover:bg-soccer-field/15">
+                            <td className="px-4 py-4">
+                              <div className="font-semibold text-sm flex flex-wrap items-center gap-1.5">
+                                <span>{res.clientName}</span>
+                                {isMulti && (
+                                  <span className="px-1.5 py-0.5 bg-soccer-orange/10 border border-soccer-orange/20 text-soccer-orange rounded text-[9px] font-mono font-bold">
+                                    MULTI
+                                  </span>
+                                )}
+                                {res.isSharedGroup && (
+                                  <span className="px-1.5 py-0.5 bg-pink-500/15 border border-pink-500/30 text-pink-400 rounded text-[9px] font-mono font-bold">
+                                    🎂 ANIVERSÁRIO
+                                  </span>
+                                )}
+                                {res.isContribution && (
+                                  <span className="px-1.5 py-0.5 bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 rounded text-[9px] font-mono font-bold">
+                                    👥 CONVIDADO DE {res.sharedGroupHost?.toUpperCase()}
+                                  </span>
+                                )}
+                              </div>
+                              
+                              <div className="text-[10px] font-mono text-soccer-cream/60 flex items-center gap-1 mt-1">
+                                <PhoneCall className="w-3 h-3 text-soccer-orange shrink-0" />
+                                <span className="select-all">{res.clientPhone}</span>
+                              </div>
+
+                              {isMulti && (
+                                <div className="mt-1 pb-1 block text-[9.5px] font-semibold text-soccer-gold">
+                                  🕒 Cliente reservou {agg.totalTables} mesas, somando total de {agg.totalPax} pessoas.
+                                </div>
+                              )}
+
+                              {/* Creation timestamp of reservation rendering dynamically */}
+                              <div className="text-[9px] font-mono text-soccer-gold/80 flex items-center gap-1 mt-1">
+                                <span>📅 Criada em: {res.createdAt ? new Date(res.createdAt).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" }) : "N/A"}</span>
+                              </div>
+
+                              {/* Action button to direct WhatsApp notification */}
+                              <div className="flex flex-wrap gap-2 mt-2.5">
+                                <button
+                                  type="button"
+                                  onClick={() => handleSendWhatsApp(res)}
+                                  className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 hover:scale-[1.02] text-white font-mono font-black text-[9px] uppercase tracking-wider px-2.5 py-1 rounded transition-all cursor-pointer shadow shadow-emerald-950/20 active:translate-y-px"
+                                >
+                                  <MessageSquare className="w-3 h-3 shrink-0" />
+                                  <span>WhatsApp 💚</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenEditRes(res)}
+                                  className="inline-flex items-center gap-1.5 bg-soccer-gold hover:bg-yellow-400 hover:scale-[1.02] text-soccer-dark font-mono font-black text-[9px] uppercase tracking-wider px-2.5 py-1 rounded transition-all cursor-pointer shadow shadow-yellow-950/20 active:translate-y-px"
+                                >
+                                  <Edit2 className="w-3 h-3 shrink-0" />
+                                  <span>Editar ✏️</span>
+                                </button>
+                              </div>
+                            </td>
+
+                            <td className="px-4 py-4 truncate max-w-[150px]">
+                              <div className="font-semibold text-soccer-cream/90">{res.gameName}</div>
+                              <div className="text-[9px] font-mono text-soccer-cream/40">ID: {(res.id || "").substring(0, 5).toUpperCase()}</div>
+                            </td>
+
+                            <td className="px-4 py-4 font-mono text-xs font-black">
+                              <span className="text-soccer-gold bg-soccer-gold/5 px-2 py-0.5 rounded border border-soccer-gold/10">
+                                {res.tableType === "mesa4" ? "M4" : "M2"}
+                              </span>
+                              <span className="ml-1 text-soccer-cream">#{res.tableNumber}</span>
+                            </td>
+
+                            <td className="px-4 py-4 font-mono">
+                              <div className="font-bold text-xs">{res.paxCount} pessoas</div>
+                              {res.hasExtraSeat && (
+                                <span className="inline-block mt-1 bg-yellow-500/10 border border-yellow-500/30 text-soccer-gold text-[8.5px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider">
+                                  +1 Extra
+                                </span>
+                              )}
+                            </td>
+
+                            <td className="px-4 py-4">
+                              <span className={`px-2 py-0.5 rounded border text-[10px] uppercase font-bold inline-block ${statusColor}`}>
+                                {res.status}
+                              </span>
+                            </td>
+
+                            <td className="px-4 py-4 text-right">
+                              <select
+                                id={`change_res_status_${res.id}`}
+                                value={res.status}
+                                onChange={(e) => handleUpdateStatus(res.id, e.target.value as ReservationStatus)}
+                                className="bg-[#051c0f] border border-soccer-field rounded-lg text-[10.5px] font-semibold text-soccer-cream py-1 px-1 outline-none cursor-pointer"
+                              >
+                                <option value="aguardando comprovante">Aguardando Pgto</option>
+                                <option value="confirmado">Confirmado ✔</option>
+                                <option value="ativa">Ativa ⚽</option>
+                                <option value="cancelado">Cancelado ✖</option>
+                                <option value="liberada automaticamente">Liberada Auto 🕒</option>
+                              </select>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {getFilteredAndSortedReservations().length === 0 && (
+                        <tr>
+                          <td colSpan={6} className="text-center py-10 text-soccer-cream/50 italic font-mono">
+                            Nenhuma reserva ativa ou no filtro para esta visualização.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Mobile View Card Layout */}
+                <div className="block lg:hidden space-y-4">
                   {getFilteredAndSortedReservations().map((res) => {
                     let statusColor = "bg-soccer-cream/10 text-soccer-cream/80 border-transparent";
                     if (res.status === "confirmado" || res.status === "ativa") {
@@ -2446,117 +2762,120 @@ Esperamos vocês!`;
                       statusColor = "bg-red-500/10 border-red-500/30 text-red-400";
                     }
 
-                    // Read other tables/pax of this duplicate client if any
                     const agg = getClientAggregation(res.clientPhone);
                     const isMulti = agg.totalTables > 1;
 
                     return (
-                      <tr key={res.id} className="hover:bg-soccer-field/15">
-                        <td className="px-4 py-4">
-                          <div className="font-semibold text-sm flex flex-wrap items-center gap-1.5">
-                            <span>{res.clientName}</span>
-                            {isMulti && (
-                              <span className="px-1.5 py-0.5 bg-soccer-orange/10 border border-soccer-orange/20 text-soccer-orange rounded text-[9px] font-mono font-bold">
-                                MULTI
-                              </span>
-                            )}
-                            {res.isSharedGroup && (
-                              <span className="px-1.5 py-0.5 bg-pink-500/15 border border-pink-500/30 text-pink-400 rounded text-[9px] font-mono font-bold">
-                                🎂 ANIVERSÁRIO
-                              </span>
-                            )}
-                            {res.isContribution && (
-                              <span className="px-1.5 py-0.5 bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 rounded text-[9px] font-mono font-bold">
-                                👥 CONVIDADO DE {res.sharedGroupHost?.toUpperCase()}
-                              </span>
-                            )}
-                          </div>
-                          
-                          <div className="text-[10px] font-mono text-soccer-cream/60 flex items-center gap-1 mt-1">
-                            <PhoneCall className="w-3 h-3 text-soccer-orange shrink-0" />
-                            <span>{res.clientPhone}</span>
-                          </div>
-
-                          {isMulti && (
-                            <div className="mt-1 pb-1 block text-[9.5px] font-semibold text-soccer-gold">
-                              🕒 Cliente reservou {agg.totalTables} mesas, somando total de {agg.totalPax} pessoas.
+                      <div key={`res_mobile_${res.id}`} className="bg-[#03150b] border-2 border-soccer-field/40 p-4 rounded-2xl flex flex-col gap-3 shadow shadow-emerald-950/20 hover:border-soccer-gold/30 transition-all">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <div className="font-semibold text-sm text-soccer-cream flex flex-wrap items-center gap-1.5">
+                              <span>{res.clientName}</span>
+                              {isMulti && (
+                                <span className="px-1.5 py-0.5 bg-soccer-orange/10 border border-soccer-orange/20 text-soccer-orange rounded text-[9px] font-mono font-bold">
+                                  MULTI
+                                </span>
+                              )}
+                              {res.isSharedGroup && (
+                                <span className="px-1.5 py-0.5 bg-pink-500/15 border border-pink-500/30 text-pink-400 rounded text-[9px] font-mono font-bold">
+                                  🎂 ANIVERSÁRIO
+                                </span>
+                              )}
+                              {res.isContribution && (
+                                <span className="px-1.5 py-0.5 bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 rounded text-[9px] font-mono font-bold">
+                                  👥 CONVIDADO DE {res.sharedGroupHost?.toUpperCase()}
+                                </span>
+                              )}
                             </div>
-                          )}
+                            <div className="text-[10px] font-mono text-soccer-cream/60 flex items-center gap-1 mt-1">
+                              <PhoneCall className="w-3 h-3 text-soccer-orange shrink-0" />
+                              <span className="select-all font-semibold font-mono">{res.clientPhone}</span>
+                            </div>
+                          </div>
+                          <div>
+                            <span className={`px-2 py-0.5 rounded border text-[9px] uppercase font-bold inline-block ${statusColor}`}>
+                              {res.status}
+                            </span>
+                          </div>
+                        </div>
 
-                          {/* Action button to direct WhatsApp notification */}
-                          <div className="flex flex-wrap gap-2 mt-2">
+                        <div className="bg-[#051c0f]/80 p-2.5 rounded-xl border border-soccer-field/30 flex flex-col gap-1.5 text-xs text-soccer-cream">
+                          <div className="flex justify-between items-center text-[10px] font-mono">
+                            <span className="text-soccer-cream/50">⚽ JOGO:</span>
+                            <span className="text-soccer-cream/90 font-bold truncate max-w-[180px]">{res.gameName}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-[10px] font-mono">
+                            <span className="text-soccer-cream/50">🪑 MESA:</span>
+                            <span className="text-soccer-gold font-bold">
+                              {res.tableType === "mesa4" ? "M4" : "M2"} #{res.tableNumber}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center text-[10px] font-mono">
+                            <span className="text-soccer-cream/50">👥 PAX:</span>
+                            <span className="text-soccer-field-light font-bold">
+                              {res.paxCount} pessoas {res.hasExtraSeat && "(+1 Cadeira Extra)"}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center text-[10px] font-mono">
+                            <span className="text-soccer-cream/50">📅 RESERVADO EM:</span>
+                            <span className="text-soccer-gold font-semibold font-mono">
+                              {res.createdAt ? new Date(res.createdAt).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" }) : "N/A"}
+                            </span>
+                          </div>
+                        </div>
+
+                        {isMulti && (
+                          <div className="text-[9.5px] font-semibold text-soccer-gold">
+                            🕒 Cliente reservou {agg.totalTables} mesas, somando total de {agg.totalPax} pessoas.
+                          </div>
+                        )}
+
+                        <div className="flex flex-wrap gap-2 items-center justify-between border-t border-soccer-field/11 pt-2.5">
+                          <div className="flex gap-1.5 flex-wrap">
                             <button
                               type="button"
                               onClick={() => handleSendWhatsApp(res)}
-                              className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 hover:scale-[1.02] text-white font-mono font-black text-[9px] uppercase tracking-wider px-2.5 py-1 rounded transition-all cursor-pointer shadow shadow-emerald-950/20 active:translate-y-px"
+                              className="inline-flex items-center gap-1 bg-emerald-600 hover:bg-emerald-500 text-white font-mono font-black text-[9px] uppercase tracking-wider px-2 py-1.5 rounded transition-all cursor-pointer shadow active:translate-y-px"
                             >
-                              <MessageSquare className="w-3 h-3 shrink-0" />
+                              <MessageSquare className="w-3.5 h-3.5 shrink-0" />
                               <span>WhatsApp 💚</span>
                             </button>
                             <button
                               type="button"
                               onClick={() => handleOpenEditRes(res)}
-                              className="inline-flex items-center gap-1.5 bg-soccer-gold hover:bg-yellow-400 hover:scale-[1.02] text-soccer-dark font-mono font-black text-[9px] uppercase tracking-wider px-2.5 py-1 rounded transition-all cursor-pointer shadow shadow-yellow-950/20 active:translate-y-px"
+                              className="inline-flex items-center gap-1 bg-soccer-gold hover:bg-yellow-400 text-soccer-dark font-mono font-black text-[9px] uppercase tracking-wider px-2 py-1.5 rounded transition-all cursor-pointer shadow active:translate-y-px"
                             >
-                              <Edit2 className="w-3 h-3 shrink-0" />
+                              <Edit2 className="w-3.5 h-3.5 shrink-0" />
                               <span>Editar ✏️</span>
                             </button>
                           </div>
-                        </td>
 
-                        <td className="px-4 py-4 truncate max-w-[150px]">
-                          <div className="font-semibold text-soccer-cream/90">{res.gameName}</div>
-                          <div className="text-[9px] font-mono text-soccer-cream/40">ID: {(res.id || "").substring(0, 5).toUpperCase()}</div>
-                        </td>
-
-                        <td className="px-4 py-4 font-mono text-xs font-black">
-                          <span className="text-soccer-gold bg-soccer-gold/5 px-2 py-0.5 rounded border border-soccer-gold/10">
-                            {res.tableType === "mesa4" ? "M4" : "M2"}
-                          </span>
-                          <span className="ml-1 text-soccer-cream">#{res.tableNumber}</span>
-                        </td>
-
-                        <td className="px-4 py-4 font-mono">
-                          <div className="font-bold text-xs">{res.paxCount} pessoas</div>
-                          {res.hasExtraSeat && (
-                            <span className="inline-block mt-1 bg-yellow-500/10 border border-yellow-500/30 text-soccer-gold text-[8.5px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider">
-                              +1 Extra
-                            </span>
-                          )}
-                        </td>
-
-                        <td className="px-4 py-4">
-                          <span className={`px-2 py-0.5 rounded border text-[10px] uppercase font-bold inline-block ${statusColor}`}>
-                            {res.status}
-                          </span>
-                        </td>
-
-                        <td className="px-4 py-4 text-right">
-                          <select
-                            id={`change_res_status_${res.id}`}
-                            value={res.status}
-                            onChange={(e) => handleUpdateStatus(res.id, e.target.value as ReservationStatus)}
-                            className="bg-[#051c0f] border border-soccer-field rounded-lg text-[10.5px] font-semibold text-soccer-cream py-1 px-1 outline-none cursor-pointer"
-                          >
-                            <option value="aguardando comprovante">Aguardando Pgto</option>
-                            <option value="confirmado">Confirmado ✔</option>
-                            <option value="ativa">Ativa ⚽</option>
-                            <option value="cancelado">Cancelado ✖</option>
-                            <option value="liberada automaticamente">Liberada Auto 🕒</option>
-                          </select>
-                        </td>
-                      </tr>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[9px] font-mono text-soccer-cream/40">Status:</span>
+                            <select
+                              id={`change_res_status_mobile_${res.id}`}
+                              value={res.status}
+                              onChange={(e) => handleUpdateStatus(res.id, e.target.value as ReservationStatus)}
+                              className="bg-[#051c0f] border border-soccer-field rounded-lg text-[9px] font-bold text-soccer-cream py-1 px-1 outline-none cursor-pointer"
+                            >
+                              <option value="aguardando comprovante">Aguardando Pgto</option>
+                              <option value="confirmado">Confirmado ✔</option>
+                              <option value="ativa">Ativa ⚽</option>
+                              <option value="cancelado">Cancelado ✖</option>
+                              <option value="liberada automaticamente">Liberada Auto 🕒</option>
+                            </select>
+                          </div>
+                        </div>
+                      </div>
                     );
                   })}
                   {getFilteredAndSortedReservations().length === 0 && (
-                    <tr>
-                      <td colSpan={6} className="text-center py-10 text-soccer-cream/50 italic font-mono">
-                        Nenhuma reserva ativa ou no filtro para esta visualização.
-                      </td>
-                    </tr>
+                    <div className="text-center py-10 text-soccer-cream/50 italic font-mono bg-[#03150b] rounded-2xl border border-soccer-field">
+                      Nenhuma reserva ativa ou no filtro para esta visualização.
+                    </div>
                   )}
-                </tbody>
-              </table>
+                </div>
+              </>
             )}
           </div>
 
@@ -3635,17 +3954,32 @@ Esperamos vocês!`;
                 </div>
                 <button
                   type="button"
-                  onClick={() => setEditingRes(null)}
+                  onClick={() => {
+                    setEditingRes(null);
+                    setEditingGroupReservations(null);
+                  }}
                   className="text-soccer-cream/50 hover:text-soccer-cream p-1 bg-white/5 hover:bg-white/10 rounded-full transition-all cursor-pointer"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
-              <div className="bg-[#03150b] p-3 rounded-xl border border-soccer-field/40 text-[11px] font-mono text-soccer-gold/90 mb-6 flex flex-col gap-1">
+              <div className="bg-[#03150b] p-3 rounded-xl border border-soccer-field/40 text-[11px] font-mono text-soccer-gold/90 mb-6 flex flex-col gap-1.5">
                 <div>⚽ JOGO: {editingRes.gameName}</div>
-                <div>🪑 TIPO DE MESA: {editingRes.tableType === "mesa4" ? "Mesa para 4 (M4)" : "Mesa para 2 (M2)"} #{editingRes.tableNumber}</div>
-                <div>🆔 ID DA RESERVA: {editingRes.id.toUpperCase()}</div>
+                {editingGroupReservations && editingGroupReservations.length > 1 ? (
+                  <div className="text-soccer-orange font-bold uppercase mt-1">
+                    👥 GRUPO: {editingGroupReservations.length} mesas reservadas por este contato.
+                    <div className="font-mono text-[10px] text-soccer-cream/70 mt-1 capitalize normal-case font-normal leading-relaxed text-justify">
+                      *O nome e o telefone atualizados abaixo serão aplicados automaticamente a todos os {editingGroupReservations.length} registros de mesa deste grupo para agilizar o processo.
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div>🪑 TIPO DE MESA: {editingRes.tableType === "mesa4" ? "Mesa para 4 (M4)" : "Mesa para 2 (M2)"} #{editingRes.tableNumber}</div>
+                    <div>🆔 ID DA RESERVA: {editingRes.id.toUpperCase()}</div>
+                    <div>📅 REALIZADA EM: {editingRes.createdAt ? new Date(editingRes.createdAt).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" }) : "N/A"}</div>
+                  </>
+                )}
               </div>
 
               <form onSubmit={handleSaveResEdit} className="space-y-4">
@@ -3673,37 +4007,39 @@ Esperamos vocês!`;
                   />
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-[10px] font-mono text-soccer-gold uppercase mb-1">Número de Cadeiras (Pax)</label>
-                    <select
-                      value={editResPax}
-                      onChange={(e) => setEditResPax(Number(e.target.value))}
-                      className="w-full bg-[#051c0f] border border-soccer-field rounded-xl py-2 px-3 text-xs text-soccer-cream outline-none focus:border-soccer-gold cursor-pointer"
-                    >
-                      <option value="1">1 Cadeira</option>
-                      <option value="2">2 Cadeiras</option>
-                      <option value="3">3 Cadeiras</option>
-                      <option value="4">4 Cadeiras</option>
-                      <option value="5">5 Cadeiras</option>
-                      <option value="6">6 Cadeiras</option>
-                      <option value="7">7 Cadeiras</option>
-                      <option value="8">8 Cadeiras</option>
-                    </select>
-                  </div>
+                {(!editingGroupReservations || editingGroupReservations.length <= 1) && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[10px] font-mono text-soccer-gold uppercase mb-1">Número de Cadeiras (Pax)</label>
+                      <select
+                        value={editResPax}
+                        onChange={(e) => setEditResPax(Number(e.target.value))}
+                        className="w-full bg-[#051c0f] border border-soccer-field rounded-xl py-2 px-3 text-xs text-soccer-cream outline-none focus:border-soccer-gold cursor-pointer"
+                      >
+                        <option value="1">1 Cadeira</option>
+                        <option value="2">2 Cadeiras</option>
+                        <option value="3">3 Cadeiras</option>
+                        <option value="4">4 Cadeiras</option>
+                        <option value="5">5 Cadeiras</option>
+                        <option value="6">6 Cadeiras</option>
+                        <option value="7">7 Cadeiras</option>
+                        <option value="8">8 Cadeiras</option>
+                      </select>
+                    </div>
 
-                  <div className="flex items-end pb-1.5">
-                    <label className="flex items-center gap-2 bg-[#051c0f] border border-soccer-field rounded-xl py-2 px-3 text-xs text-soccer-cream outline-none cursor-pointer w-full hover:border-soccer-gold transition-colors">
-                      <input
-                        type="checkbox"
-                        checked={editResExtra}
-                        onChange={(e) => setEditResExtra(e.target.checked)}
-                        className="w-4 h-4 accent-soccer-field rounded cursor-pointer"
-                      />
-                      <span className="text-[10px] font-mono uppercase text-soccer-gold">Cadeira Extra (+1)</span>
-                    </label>
+                    <div className="flex items-end pb-1.5">
+                      <label className="flex items-center gap-2 bg-[#051c0f] border border-soccer-field rounded-xl py-2 px-3 text-xs text-soccer-cream outline-none cursor-pointer w-full hover:border-soccer-gold transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={editResExtra}
+                          onChange={(e) => setEditResExtra(e.target.checked)}
+                          className="w-4 h-4 accent-soccer-field rounded cursor-pointer"
+                        />
+                        <span className="text-[10px] font-mono uppercase text-soccer-gold">Cadeira Extra (+1)</span>
+                      </label>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {resEditError && (
                   <div className="bg-red-950/50 border border-red-700/50 rounded-xl p-3 flex items-start gap-2 text-xs text-red-200">
@@ -3715,7 +4051,10 @@ Esperamos vocês!`;
                 <div className="flex gap-2 pt-2">
                   <button
                     type="button"
-                    onClick={() => setEditingRes(null)}
+                    onClick={() => {
+                      setEditingRes(null);
+                      setEditingGroupReservations(null);
+                    }}
                     className="w-1/3 py-2.5 bg-white/5 hover:bg-white/10 text-soccer-cream text-xs font-semibold rounded-xl transition-all cursor-pointer text-center"
                   >
                     Voltar
