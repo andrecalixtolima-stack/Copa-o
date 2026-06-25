@@ -306,7 +306,14 @@ export default function ReservationModal({
 
     // Check if the user already has a pending ("aguardando comprovante") reservation
     if (!bypassDuplicate) {
-      const normPhone = (p: string) => p.replace(/\D/g, "");
+      const normPhone = (p: string) => {
+        if (!p) return "";
+        let num = p.replace(/\D/g, "");
+        if ((num.length === 10 || num.length === 11) && !num.startsWith("55")) {
+          num = "55" + num;
+        }
+        return num;
+      };
       const cleanPhone = normPhone(clientPhone);
       
       const existingPending = activeReservationsForGame.find(

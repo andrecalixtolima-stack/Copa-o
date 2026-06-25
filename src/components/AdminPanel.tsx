@@ -588,12 +588,12 @@ Esperamos vocês!`;
         occurrences: []
       };
     }
-    const normPhone = String(phone).replace(/\D/g, "");
+    const normPhone = normalizePhone(phone);
     const occurrences = reservations.filter(r => {
       if (!r.clientPhone) return false;
       const isCancelled = r.status === "cancelado" || r.status === "liberada automaticamente";
       if (activeOnly && isCancelled) return false;
-      return String(r.clientPhone).replace(/\D/g, "") === normPhone;
+      return normalizePhone(r.clientPhone) === normPhone;
     });
     
     const totalTables = occurrences.length;
@@ -610,7 +610,7 @@ Esperamos vocês!`;
     const groups: { [key: string]: Reservation[] } = {};
     
     list.forEach(r => {
-      const phoneKey = r.clientPhone ? String(r.clientPhone).replace(/\D/g, "") : `no_phone_${r.id}`;
+      const phoneKey = r.clientPhone ? normalizePhone(r.clientPhone) : `no_phone_${r.id}`;
       const key = `${r.gameId}_${phoneKey}`;
       if (!groups[key]) {
         groups[key] = [];
@@ -669,8 +669,8 @@ Esperamos vocês!`;
       ? filteredByGame.filter(r => {
           const query = resSearchQuery.toLowerCase().trim();
           const name = (r.clientName || "").toLowerCase();
-          const phone = (r.clientPhone || "").replace(/\D/g, "");
-          const cleanQuery = query.replace(/\D/g, "");
+          const phone = normalizePhone(r.clientPhone);
+          const cleanQuery = normalizePhone(query);
           return name.includes(query) || phone.includes(cleanQuery || query);
         })
       : filteredByGame;
